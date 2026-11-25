@@ -18,7 +18,7 @@ fetch() {
   fi
   mkdir -p "$(dirname "$target")"
   if curl -fL --retry 2 --max-time 120 "$RELEASES/$asset" -o "$TMP/$asset"; then
-    tar -xf "$TMP/$asset" -C "$TMP" 2>/dev/null || true
+    tar -xzf "$TMP/$asset" -C "$TMP" 2>/dev/null || true
     local binary
     binary="$(find "$TMP" -maxdepth 2 -type f -name 'stockfish*' ! -name "$asset" | head -n1)"
     if [[ -n "$binary" ]]; then
@@ -32,5 +32,8 @@ fetch() {
   return 0
 }
 
-fetch arm64-v8a stockfish-android-armv8.tar
-fetch x86_64 stockfish-android-x86_64.tar
+fetch arm64-v8a stockfish-android-arm64-universal.tar.gz
+
+# Official Stockfish releases no longer publish an Android x86_64 binary. The app keeps
+# the x86_64 jniLibs slot for a user-supplied build, but engine features are optional there.
+echo "x86_64: no official Stockfish Android asset; skipping (engine disabled on that ABI)"

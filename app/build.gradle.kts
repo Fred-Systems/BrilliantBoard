@@ -148,9 +148,10 @@ tasks.register("downloadStockfish") {
     group = "setup"
     description = "Downloads arm64-v8a and x86_64 Stockfish binaries into app/src/main/jniLibs"
     val jniLibs = File(projectDir, "src/main/jniLibs")
+    // The official release publishes an arm64 Android binary; no x86_64 Android asset
+    // exists, so that ABI is left to a user-supplied binary (engine features optional).
     val binaries = mapOf(
-        "arm64-v8a" to "https://github.com/official-stockfish/Stockfish/releases/latest/download/stockfish-android-armv8.tar",
-        "x86_64" to "https://github.com/official-stockfish/Stockfish/releases/latest/download/stockfish-android-x86_64.tar"
+        "arm64-v8a" to "https://github.com/official-stockfish/Stockfish/releases/latest/download/stockfish-android-arm64-universal.tar.gz"
     )
     doLast {
         binaries.forEach { (abi, url) ->
@@ -161,12 +162,12 @@ tasks.register("downloadStockfish") {
             }
             runCatching {
                 target.parentFile.mkdirs()
-                val archive = File(project.buildDir, "stockfish-$abi.tar")
+                val archive = File(project.buildDir, "stockfish-$abi.tar.gz")
                 URL(url).openStream().use { input ->
                     FileOutputStream(archive).use { output -> input.copyTo(output) }
                 }
                 project.exec {
-                    commandLine("tar", "-xf", archive.absolutePath, "-C", target.parentFile.absolutePath)
+                    commandLine("tar", "-xzf", archive.absolutePath, "-C", target.parentFile.absolutePath)
                 }
                 val extracted = target.parentFile.listFiles()?.firstOrNull {
                     it.isFile && it.name.startsWith("stockfish") && it.name != target.name

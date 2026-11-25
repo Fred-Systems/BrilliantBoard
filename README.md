@@ -78,7 +78,7 @@ so unit tests still compile and run. Place binaries at:
 
 ```
 app/src/main/jniLibs/arm64-v8a/libstockfish.so
-app/src/main/jniLibs/x86_64/libstockfish.so
+app/src/main/jniLibs/x86_64/libstockfish.so   # optional; no official x86_64 Android asset
 ```
 
 `extractNativeLibs=true` and legacy JNI packaging are configured so `ProcessBuilder` can
