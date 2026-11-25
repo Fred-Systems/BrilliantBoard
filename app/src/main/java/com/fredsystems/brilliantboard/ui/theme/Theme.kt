@@ -18,18 +18,6 @@ val Good = Color(0xFF81B64C)
 val Warning = Color(0xFFF3C969)
 val Danger = Color(0xFFE76A5E)
 
-enum class BoardTheme(val light: Color, val dark: Color, val lastMove: Color) {
-    EMERALD(Color(0xFFEEEED2), Color(0xFF769656), Color(0xFFBACA44)),
-    BLUE(Color(0xFFDEE3E6), Color(0xFF6E8296), Color(0xFFB0C2D4)),
-    GREY(Color(0xFFE8E8E8), Color(0xFF7A7A7A), Color(0xFFB0B0B0)),
-    WOOD(Color(0xFFF0D9B5), Color(0xFFB58863), Color(0xFFCFA97B)),
-    AMOLED(Color(0xFF2B2B2B), Color(0xFF111111), Color(0xFF4A5D3A));
-
-    companion object {
-        fun from(name: String): BoardTheme = entries.firstOrNull { it.name.equals(name, true) } ?: EMERALD
-    }
-}
-
 @Composable
 fun BrilliantBoardTheme(
     dynamicColor: Boolean = false,

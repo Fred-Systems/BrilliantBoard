@@ -36,6 +36,7 @@ import org.koin.androidx.compose.koinViewModel
 fun HomeScreen(
     onNavigate: (String) -> Unit,
     viewModel: HomeViewModel = koinViewModel(),
+    searchViewModel: com.fredsystems.brilliantboard.ui.SearchViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     var username by remember { mutableStateOf("") }
@@ -57,12 +58,14 @@ fun HomeScreen(
 
         item {
             SectionCard(title = "Link your account") {
-                OutlinedTextField(
+                com.fredsystems.brilliantboard.ui.common.UsernameSearchField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Username") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    label = "Username (smart search)",
+                    searchViewModel = searchViewModel,
+                    onSelected = { _, suggestedPlatform ->
+                        suggestedPlatform?.let { platform = it }
+                    },
                 )
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

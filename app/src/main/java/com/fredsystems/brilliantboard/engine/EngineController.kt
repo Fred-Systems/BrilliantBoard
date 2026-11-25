@@ -119,13 +119,15 @@ class StockfishEngine(private val context: Context) : PositionEvaluator {
             send("position fen $fen$moveSuffix")
             send("go depth $depth")
             val best = mutableMapOf<Int, EngineLine>()
-            withTimeout(120_000L) {
-                while (true) {
-                    val line = lines.receiveCatching().getOrNull() ?: break
-                    if (line.startsWith("bestmove")) break
-                    parseInfo(line)?.let { best[it.multiPv] = it.line }
+            runCatching {
+                withTimeout(45_000L) {
+                    while (true) {
+                        val line = lines.receiveCatching().getOrNull() ?: break
+                        if (line.startsWith("bestmove")) break
+                        parseInfo(line)?.let { best[it.multiPv] = it.line }
+                    }
                 }
-            }
+            }.onFailure { send("stop") }
             best.entries.sortedBy { it.key }.map { it.value }
         }
     }

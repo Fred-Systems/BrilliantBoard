@@ -7,6 +7,8 @@ import com.fredsystems.brilliantboard.data.remote.MoveSuggestion
 import com.fredsystems.brilliantboard.data.remote.ExplorerApi
 import com.fredsystems.brilliantboard.data.repository.ChessRepository
 import com.fredsystems.brilliantboard.data.repository.SettingsRepository
+import com.fredsystems.brilliantboard.data.repository.SmartSearchRepository
+import com.fredsystems.brilliantboard.data.repository.PlayerSuggestion
 import com.fredsystems.brilliantboard.data.repository.SyncEngine
 import com.fredsystems.brilliantboard.domain.chess.ChessMove
 import com.fredsystems.brilliantboard.domain.chess.Position
@@ -30,12 +32,50 @@ import com.fredsystems.brilliantboard.domain.scouting.TiltProfile
 import com.fredsystems.brilliantboard.domain.scouting.Wdl
 import com.fredsystems.brilliantboard.engine.PgnEvaluator
 import com.fredsystems.brilliantboard.engine.StockfishEngine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+data class SearchState(
+    val suggestions: List<PlayerSuggestion> = emptyList(),
+    val searching: Boolean = false,
+)
+
+class SearchViewModel(
+    private val repository: SmartSearchRepository,
+    private val sync: SyncEngine,
+) : ViewModel() {
+    private val _state = MutableStateFlow(SearchState())
+    val state: StateFlow<SearchState> = _state.asStateFlow()
+    private var job: Job? = null
+
+    fun search(query: String) {
+        job?.cancel()
+        if (query.trim().length < 2) {
+            _state.update { it.copy(suggestions = emptyList(), searching = false) }
+            return
+        }
+        _state.update { it.copy(searching = true) }
+        job = viewModelScope.launch {
+            delay(400)
+            val owner = runCatching { sync.ownAccounts().firstOrNull()?.username }.getOrNull()
+            val results = runCatching { repository.suggest(query, owner) }.getOrDefault(emptyList())
+            _state.update { it.copy(suggestions = results, searching = false) }
+        }
+    }
+
+    fun clear() {
+        job?.cancel()
+        _state.update { SearchState() }
+    }
+}
 
 data class HomeState(
     val accounts: List<PlayerProfile> = emptyList(),
@@ -66,16 +106,30 @@ class HomeViewModel(
     fun link(username: String, platform: Platform) {
         viewModelScope.launch {
             _state.update { it.copy(busy = true, message = null) }
-            runCatching {
-                sync.linkOwnAccount(username, platform)
-                val result = sync.sync(username, platform)
+            val linked = runCatching { sync.linkOwnAccount(username, platform) }
+            if (linked.isFailure) {
                 _state.update {
-                    it.copy(busy = false, message = "Imported ${result.gamesImported} games from ${platform.label}")
+                    it.copy(
+                        busy = false,
+                        message = "Could not find $username on ${platform.label}: ${linked.exceptionOrNull()?.message}",
+                    )
                 }
-                refresh()
-            }.onFailure { error ->
-                _state.update { it.copy(busy = false, message = "Import failed: ${error.message}") }
+                return@launch
             }
+            val synced = runCatching { sync.sync(username, platform) }
+            _state.update {
+                it.copy(
+                    busy = false,
+                    message = synced.fold(
+                        onSuccess = { result -> "Imported ${result.gamesImported} games from ${platform.label}" },
+                        onFailure = { error ->
+                            "Account linked, but game sync was incomplete (${error.message ?: "network error"}). " +
+                                "Use Sync all to retry."
+                        },
+                    ),
+                )
+            }
+            refresh()
         }
     }
 
@@ -138,57 +192,67 @@ class MyProfileViewModel(
 
     fun select(profile: PlayerProfile) {
         viewModelScope.launch {
-            _state.update { it.copy(selected = profile, busy = true) }
+            _state.update { it.copy(selected = profile, busy = true, message = null) }
             runCatching {
-                val games = repo.observeGames(profile.username).first()
-                val features = games.map { game ->
-                    GameFeatureExtractor.extract(game, game.userSide)
-                }
-                val openingStats = features
-                    .groupBy { it.eco ?: "?" }
-                    .mapNotNull { (eco, group) ->
-                        val wdl = group.fold(Wdl()) { acc, f -> acc + Wdl(
-                            if (f.result == com.fredsystems.brilliantboard.domain.model.GameResult.WIN) 1 else 0,
-                            if (f.result == com.fredsystems.brilliantboard.domain.model.GameResult.DRAW) 1 else 0,
-                            if (f.result == com.fredsystems.brilliantboard.domain.model.GameResult.LOSS) 1 else 0,
-                        ) }
-                        OpeningStat(eco, group.firstNotNullOfOrNull { it.openingName }.orEmpty(),
-                            group.first().side, wdl, group.size, null, null)
-                    }
-                    .sortedBy { it.wdl.scorePercent }
-
-                val tilt = com.fredsystems.brilliantboard.domain.scouting.TiltAnalytics
-                    .analyze(features, Side.WHITE)
-                val style = com.fredsystems.brilliantboard.domain.scouting.StyleProfiler
-                    .analyze(features, Side.WHITE, tilt)
-                val clock = com.fredsystems.brilliantboard.domain.scouting.ClockIQ.analyze(features, Side.WHITE)
-
-                val curves = buildRatingCurves(profile)
+                val allGames = repo.observeGames(profile.username).first()
+                val games = allGames.take(ANALYSIS_GAME_LIMIT)
+                val notice = if (allGames.size > games.size) {
+                    "Analysing the $ANALYSIS_GAME_LIMIT most recent games of ${allGames.size}"
+                } else null
+                _state.update { it.copy(message = notice) }
+                val dashboard = withContext(Dispatchers.Default) { buildDashboard(profile, games) }
+                _state.update { it.copy(busy = false, dashboard = dashboard) }
+            }.onFailure { error ->
                 _state.update {
-                    it.copy(
-                        busy = false,
-                        dashboard = ProfileDashboard(
-                            profile = profile,
-                            games = games,
-                            wdl = games.map { it.result }.fold(Wdl()) { acc, r -> acc + Wdl(
-                                if (r == com.fredsystems.brilliantboard.domain.model.GameResult.WIN) 1 else 0,
-                                if (r == com.fredsystems.brilliantboard.domain.model.GameResult.DRAW) 1 else 0,
-                                if (r == com.fredsystems.brilliantboard.domain.model.GameResult.LOSS) 1 else 0,
-                            ) },
-                            openings = openingStats,
-                            clock = clock,
-                            phases = com.fredsystems.brilliantboard.domain.scouting.PhaseMastery.analyze(games, Side.WHITE),
-                            endgames = com.fredsystems.brilliantboard.domain.scouting.EndgameConversionLab.analyze(features),
-                            tilt = tilt,
-                            tactics = com.fredsystems.brilliantboard.domain.scouting.TacticalMotifs.analyze(games, Side.WHITE),
-                            style = style,
-                            ratingCurves = curves,
-                            timeTroubleGames = features.count { it.timeTroubleBlunders > 0 },
-                        ),
-                    )
+                    it.copy(busy = false, message = "Dashboard error: ${error.message ?: "unknown error"}")
                 }
-            }.onFailure { error -> _state.update { it.copy(busy = false, message = error.message) } }
+            }
         }
+    }
+
+    private fun buildDashboard(profile: PlayerProfile, games: List<GameRecord>): ProfileDashboard {
+        val features = games.map { runCatching { GameFeatureExtractor.extract(it, it.userSide) }.getOrNull() }
+            .filterNotNull()
+        val openingStats = features
+            .groupBy { it.eco ?: "?" }
+            .mapNotNull { (eco, group) ->
+                val wdl = group.fold(Wdl()) { acc, f -> acc + Wdl(
+                    if (f.result == com.fredsystems.brilliantboard.domain.model.GameResult.WIN) 1 else 0,
+                    if (f.result == com.fredsystems.brilliantboard.domain.model.GameResult.DRAW) 1 else 0,
+                    if (f.result == com.fredsystems.brilliantboard.domain.model.GameResult.LOSS) 1 else 0,
+                ) }
+                OpeningStat(eco, group.firstNotNullOfOrNull { it.openingName }.orEmpty(),
+                    group.first().side, wdl, group.size, null, null)
+            }
+            .sortedBy { it.wdl.scorePercent }
+
+        val tilt = com.fredsystems.brilliantboard.domain.scouting.TiltAnalytics.analyze(features, Side.WHITE)
+        val style = com.fredsystems.brilliantboard.domain.scouting.StyleProfiler.analyze(features, Side.WHITE, tilt)
+        val clock = com.fredsystems.brilliantboard.domain.scouting.ClockIQ.analyze(features, Side.WHITE)
+        val wdl = games.map { it.result }.fold(Wdl()) { acc, r -> acc + Wdl(
+            if (r == com.fredsystems.brilliantboard.domain.model.GameResult.WIN) 1 else 0,
+            if (r == com.fredsystems.brilliantboard.domain.model.GameResult.DRAW) 1 else 0,
+            if (r == com.fredsystems.brilliantboard.domain.model.GameResult.LOSS) 1 else 0,
+        ) }
+
+        return ProfileDashboard(
+            profile = profile,
+            games = games,
+            wdl = wdl,
+            openings = openingStats,
+            clock = clock,
+            phases = com.fredsystems.brilliantboard.domain.scouting.PhaseMastery.analyze(games, Side.WHITE),
+            endgames = com.fredsystems.brilliantboard.domain.scouting.EndgameConversionLab.analyze(features),
+            tilt = tilt,
+            tactics = com.fredsystems.brilliantboard.domain.scouting.TacticalMotifs.analyze(games, Side.WHITE),
+            style = style,
+            ratingCurves = buildRatingCurves(profile),
+            timeTroubleGames = features.count { it.timeTroubleBlunders > 0 },
+        )
+    }
+
+    companion object {
+        private const val ANALYSIS_GAME_LIMIT = 400
     }
 
     private fun buildRatingCurves(profile: PlayerProfile): List<RatingCurve> {
@@ -304,26 +368,30 @@ class ReviewViewModel(
 
     fun toggleFlip() = _state.update { it.copy(flipped = !it.flipped) }
 
-    fun analyse() {
+    fun analyse(depth: Int = 16, multiPv: Int = 3) {
         val game = _state.value.selected ?: return
-        viewModelScope.launch {
-            _state.update { it.copy(busy = true, progress = 0f, message = null) }
+        viewModelScope.launch(Dispatchers.Default) {
+            _state.update { it.copy(busy = true, progress = 0.01f, message = null, report = null) }
             runCatching {
                 val evaluator = if (engine.isAvailable) engine else PgnEvaluator(game)
                 if (!engine.isAvailable) {
-                    _state.update { it.copy(message = "Stockfish not bundled — using evals stored in the PGN") }
+                    _state.update {
+                        it.copy(message = "Stockfish binary unavailable — using PGN/material estimates")
+                    }
                 }
-                val settings = com.fredsystems.brilliantboard.data.repository.AppSettings()
                 val report = GameReviewEngine.analyse(
                     game = game,
                     evaluator = evaluator,
-                    depth = settings.analysisDepth,
-                    multiPv = settings.multiPv,
+                    depth = depth.coerceIn(12, 22),
+                    multiPv = multiPv.coerceIn(1, 5),
+                    maxPlies = 120,
                     onProgress = { progress -> _state.update { it.copy(progress = progress) } },
                 )
-                _state.update { it.copy(busy = false, report = report) }
+                _state.update { it.copy(busy = false, progress = 1f, report = report) }
             }.onFailure { error ->
-                _state.update { it.copy(busy = false, message = error.message) }
+                _state.update {
+                    it.copy(busy = false, message = "Analysis failed: ${error.message ?: "unknown error"}")
+                }
             }
         }
     }
@@ -455,7 +523,10 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
     }
 
     fun setTheme(theme: String) = viewModelScope.launch { repository.setBoardTheme(theme) }
+    fun setPieceSet(set: String) = viewModelScope.launch { repository.setPieceSet(set) }
+    fun setBoardScale(scale: Float) = viewModelScope.launch { repository.setBoardScale(scale) }
     fun setSound(enabled: Boolean) = viewModelScope.launch { repository.setSound(enabled) }
     fun setDepth(depth: Int) = viewModelScope.launch { repository.setDepth(depth) }
     fun setDynamic(enabled: Boolean) = viewModelScope.launch { repository.setDynamicColor(enabled) }
+    fun setAutoUpdates(enabled: Boolean) = viewModelScope.launch { repository.setAutoUpdates(enabled) }
 }

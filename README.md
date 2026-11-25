@@ -10,6 +10,14 @@ move classification, and an interactive Compose chessboard.
 
 ## Features
 
+### Usability
+- Debounced smart username search while typing (local accounts, game history and live
+  Chess.com/Lichess profile matches) for both importing and opponent scouting.
+- Aetheris-derived board: 25 board colour themes and 42 Lichess piece sets selectable in
+  Settings, with drag/tap moves, legal indicators, check glow, arrows and piece animation.
+- Settings → Updates checks GitHub Releases, offers one-tap install of the signed APK and
+  always allows saving the latest APK to device Downloads.
+
 ### Import & sync
 - Chess.com public API with custom `User-Agent`, ETag conditional requests, incremental
   monthly archive sync and a polite 300 ms rate limiter.

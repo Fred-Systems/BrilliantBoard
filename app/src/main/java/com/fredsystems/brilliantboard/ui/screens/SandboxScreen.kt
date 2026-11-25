@@ -30,8 +30,12 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
-fun SandboxScreen(viewModel: SandboxViewModel = koinViewModel()) {
+fun SandboxScreen(
+    viewModel: SandboxViewModel = koinViewModel(),
+    settingsViewModel: com.fredsystems.brilliantboard.ui.SettingsViewModel = koinViewModel(),
+) {
     val state by viewModel.state.collectAsState()
+    val settings by settingsViewModel.state.collectAsState()
     val scope = rememberCoroutineScope()
 
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -41,9 +45,12 @@ fun SandboxScreen(viewModel: SandboxViewModel = koinViewModel()) {
                     EvaluationBar(winPercent = state.winPercent ?: 50f, modifier = Modifier.height(340.dp))
                     BoardWithCoords(
                         position = state.position,
-                        theme = BoardTheme.EMERALD,
+                        pieceSet = settings.settings.pieceSet,
+                        theme = com.fredsystems.brilliantboard.ui.theme.BoardThemes.byId(settings.settings.boardTheme),
                         flipped = state.flipped,
                         lastMove = state.lastMove,
+                        showLegalMoves = settings.settings.showLegalMoves,
+                        boardSize = (340 * settings.settings.boardScale).dp,
                         onSquareClick = {},
                         onMove = { viewModel.onMove(it) },
                     )

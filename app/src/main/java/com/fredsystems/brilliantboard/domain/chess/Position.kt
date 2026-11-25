@@ -356,7 +356,7 @@ data class Position(
     }
 
     fun parseUci(raw: String): ChessMove? {
-        if (raw.length !in 2..5) return null
+        if (raw.length !in 4..5) return null
         val from = squareIndex(raw.substring(0, 2)) ?: return null
         val to = squareIndex(raw.substring(2, 4)) ?: return null
         val promotion = raw.getOrNull(4)?.lowercaseChar()?.takeIf { it in "qrbn" }

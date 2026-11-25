@@ -31,18 +31,24 @@ import com.fredsystems.brilliantboard.ui.theme.Warning
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
-fun ScoutScreen(viewModel: ScoutViewModel = koinViewModel()) {
+fun ScoutScreen(
+    viewModel: ScoutViewModel = koinViewModel(),
+    searchViewModel: com.fredsystems.brilliantboard.ui.SearchViewModel = koinViewModel(),
+) {
     val state by viewModel.state.collectAsState()
 
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         item {
             SectionCard(title = "Opponent prep") {
-                OutlinedTextField(
+                com.fredsystems.brilliantboard.ui.common.UsernameSearchField(
                     value = state.query,
-                    onValueChange = { viewModel.setQuery(it) },
-                    label = { Text("Username to scout") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    onValueChange = { viewModel.setQuery(it); searchViewModel.search(it) },
+                    label = "Username to scout (smart search)",
+                    searchViewModel = searchViewModel,
+                    onSelected = { name, suggestedPlatform ->
+                        viewModel.setQuery(name)
+                        suggestedPlatform?.let { viewModel.setPlatform(it) }
+                    },
                 )
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -94,10 +94,18 @@ class SyncEngine(
         val archives = chessComApi.archives(username)
         var imported = 0
         archives.filter { archiveEnd(it) >= lastSync }.forEach { url ->
-            val games = chessComApi.monthlyGames(url)
-            val records = games.mapNotNull { it.toRecord(username, url) }
-            gameDao.upsertAll(records.map { it.toEntity(username.lowercase()) })
-            imported += records.size
+            runCatching {
+                val games = chessComApi.monthlyGames(url)
+                val records = games.mapNotNull { game ->
+                    runCatching { game.toRecord(username, url) }.getOrNull()
+                }
+                if (records.isNotEmpty()) {
+                    gameDao.upsertAll(records.map { it.toEntity(username.lowercase()) })
+                }
+                imported += records.size
+            }.onFailure {
+                // A single bad month must not abort the whole import.
+            }
         }
         return imported
     }
@@ -127,7 +135,8 @@ class SyncEngine(
         val batch = mutableListOf<GameRecord>()
         lichessApi.games(username, since = lastSync.takeIf { it > 0 }).collect { game ->
             val pgn = game.pgn ?: return@collect
-            val record = parser.parse(pgn, Platform.LICHESS, user = username) ?: return@collect
+            val record = runCatching { parser.parse(pgn, Platform.LICHESS, user = username) }.getOrNull()
+                ?: return@collect
             batch += record
             if (batch.size >= 250) {
                 gameDao.upsertAll(batch.map { it.toEntity(username.lowercase()) })

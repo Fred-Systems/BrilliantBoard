@@ -73,6 +73,19 @@ class PgnParserTest {
     }
 
     @Test
+    fun malformedMoveTokensAreSkippedWithoutCrashing() {
+        val broken = """
+            [White "A"][Black "B"][Result "*"][ECO "A00"]
+
+            1. e4 zz e5 2. Nf3 1-0
+        """.trimIndent()
+        val game = PgnParser.parse(broken, Platform.CHESS_COM)
+        assertNotNull(game)
+        assertTrue(game!!.moves.isNotEmpty())
+        assertTrue(game.moves.none { it.san == "zz" })
+    }
+
+    @Test
     fun detectsSacrificeAndCheck() {
         val matePgn = """
             [White "A"][Black "B"][Result "0-1"][ECO "A00"]

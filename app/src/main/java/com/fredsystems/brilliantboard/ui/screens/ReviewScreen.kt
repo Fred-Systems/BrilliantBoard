@@ -44,15 +44,15 @@ import org.koin.androidx.compose.koinViewModel
 fun ReviewScreen(
     homeViewModel: HomeViewModel = koinViewModel(),
     viewModel: ReviewViewModel = koinViewModel(),
+    settingsViewModel: com.fredsystems.brilliantboard.ui.SettingsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val accounts by homeViewModel.state.collectAsState()
+    val settings by settingsViewModel.state.collectAsState()
 
     LaunchedEffect(accounts.accounts.map { it.username }) {
         accounts.accounts.firstOrNull()?.let { viewModel.load(it.username) }
     }
-
-    val boardTheme = BoardTheme.EMERALD
 
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         item {
@@ -72,7 +72,9 @@ fun ReviewScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                     Button(
-                        onClick = { viewModel.analyse() },
+                        onClick = {
+                            viewModel.analyse(settings.settings.analysisDepth, settings.settings.multiPv)
+                        },
                         enabled = !state.busy && state.selected != null,
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text(if (state.busy) "Analysing ${(state.progress * 100).toInt()}%" else "Analyse with Stockfish") }
@@ -96,10 +98,13 @@ fun ReviewScreen(
                         )
                         BoardWithCoords(
                             position = state.position,
-                            theme = boardTheme,
+                            pieceSet = settings.settings.pieceSet,
+                            theme = com.fredsystems.brilliantboard.ui.theme.BoardThemes.byId(settings.settings.boardTheme),
                             flipped = state.flipped,
                             lastMove = state.lastMove,
                             arrows = state.arrows,
+                            showLegalMoves = false,
+                            boardSize = (340 * settings.settings.boardScale).dp,
                             onSquareClick = {},
                             onMove = {},
                         )

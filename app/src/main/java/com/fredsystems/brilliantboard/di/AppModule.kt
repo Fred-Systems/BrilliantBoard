@@ -10,14 +10,18 @@ import com.fredsystems.brilliantboard.data.remote.RateLimiter
 import com.fredsystems.brilliantboard.data.repository.ChessRepository
 import com.fredsystems.brilliantboard.data.repository.SettingsRepository
 import com.fredsystems.brilliantboard.data.repository.SyncEngine
+import com.fredsystems.brilliantboard.data.repository.UpdateRepository
+import com.fredsystems.brilliantboard.data.repository.SmartSearchRepository
 import com.fredsystems.brilliantboard.data.scraper.PgnParser
 import com.fredsystems.brilliantboard.engine.StockfishEngine
 import com.fredsystems.brilliantboard.ui.HomeViewModel
+import com.fredsystems.brilliantboard.ui.SearchViewModel
 import com.fredsystems.brilliantboard.ui.MyProfileViewModel
 import com.fredsystems.brilliantboard.ui.ReviewViewModel
 import com.fredsystems.brilliantboard.ui.SandboxViewModel
 import com.fredsystems.brilliantboard.ui.ScoutViewModel
 import com.fredsystems.brilliantboard.ui.SettingsViewModel
+import com.fredsystems.brilliantboard.ui.UpdateViewModel
 import com.fredsystems.brilliantboard.util.MoveSounds
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -74,6 +78,8 @@ val appModule = module {
     single { ChessRepository(get(), get()) }
     single { SettingsRepository(androidContext()) }
     single { SyncEngine(get(), get(), get(), get(), get(), get(), get()) }
+    single { SmartSearchRepository(get(), get(), get(), get()) }
+    single { UpdateRepository(get()) }
     single { StockfishEngine(androidContext()) }
     single { MoveSounds(androidContext()) }
 
@@ -83,4 +89,6 @@ val appModule = module {
     viewModel { ReviewViewModel(get(), get()) }
     viewModel { SandboxViewModel(get(), get(), get(), get()) }
     viewModel { SettingsViewModel(get()) }
+    viewModel { SearchViewModel(get(), get()) }
+    viewModel { UpdateViewModel(get()) }
 }

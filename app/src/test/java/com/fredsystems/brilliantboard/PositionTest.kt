@@ -78,6 +78,13 @@ class PositionTest {
     }
 
     @Test
+    fun shortMalformedUciNeverThrows() {
+        assertEquals(null, Position.START.parseUci("e4"))
+        assertEquals(null, Position.START.parseUci("e2e"))
+        assertEquals(null, Position.START.parseUci(""))
+    }
+
+    @Test
     fun disambiguatesKnightMoves() {
         val position = Position.fromFen("4k3/8/8/8/8/8/8/4K2N w - - 0 1")
         val legalMoves = position.legalMoves()

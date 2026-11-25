@@ -18,6 +18,9 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE username = :username AND platform = :platform LIMIT 1")
     suspend fun find(username: String, platform: String): AccountEntity?
 
+    @Query("SELECT * FROM accounts WHERE username LIKE :pattern ORDER BY isOwn DESC LIMIT 20")
+    suspend fun search(pattern: String): List<AccountEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(account: AccountEntity)
 
@@ -49,6 +52,12 @@ interface GameDao {
 
     @Query("SELECT COUNT(*) FROM games WHERE ownerUsername = :username")
     suspend fun count(username: String): Int
+
+    @Query("SELECT DISTINCT white AS name FROM games WHERE white LIKE :pattern ORDER BY name LIMIT 15")
+    suspend fun whiteNames(pattern: String): List<String>
+
+    @Query("SELECT DISTINCT black AS name FROM games WHERE black LIKE :pattern ORDER BY name LIMIT 15")
+    suspend fun blackNames(pattern: String): List<String>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(games: List<GameEntity>)
