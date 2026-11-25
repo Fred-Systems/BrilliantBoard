@@ -91,6 +91,11 @@ execute the binary from `nativeLibraryDir`.
 provide a gitignored `keystore.properties` with `storeFile`, `storePassword`, `keyAlias`,
 `keyPassword`.
 
+These four secrets are already configured on the GitHub repository (`Settings → Secrets →
+Actions`), so future releases only require: bump versions, commit, then push a `vX.Y.Z` tag.
+The release key is stored locally at `/home/simchar70/.brilliantboard/` (gitignored, outside
+the repo) with full recovery details in `RELEASE_CREDENTIALS.txt`.
+
 ## CI/CD
 
 `.github/workflows/release.yml` runs on `v*` tags or manual dispatch. It sets up JDK 17 and
