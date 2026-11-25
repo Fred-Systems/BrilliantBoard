@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.BrilliantBoard" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorBackground">@color/board_dark</item>
+        <item name="android:statusBarColor">@color/board_dark</item>
+        <item name="android:navigationBarColor">@color/board_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <color name="board_dark">#0B0C10</color>
+    <color name="board_light">#1F2833</color>
+    <color name="accent">#66FCF1</color>
+</resources>

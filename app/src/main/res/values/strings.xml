@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BrilliantBoard</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_my_profile">My Profile</string>
+    <string name="nav_scout">Opponent Scout</string>
+    <string name="nav_analysis">Analysis</string>
+    <string name="nav_settings">Settings</string>
+    <string name="import_account">Import account</string>
+    <string name="search_opponent">Search opponent</string>
+    <string name="analyse">Analyse</string>
+    <string name="best_line">Show best line</string>
+    <string name="retry_mistake">Retry mistake</string>
+</resources>
