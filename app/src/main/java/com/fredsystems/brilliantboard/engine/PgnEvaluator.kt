@@ -17,7 +17,7 @@ class PgnEvaluator(private val game: GameRecord) : PositionEvaluator {
     ): List<EngineLine> {
         val index = moves.size.coerceAtMost(game.moves.size)
         val move = game.moves.getOrNull(index)
-        val cp = move?.evalCp ?: materialEstimate(fen)
+        val cp = move?.evalCp ?: MaterialEvaluator.estimate(fen)
         val mate = move?.mate
         return listOf(
             EngineLine(
@@ -27,18 +27,5 @@ class PgnEvaluator(private val game: GameRecord) : PositionEvaluator {
                 depth = 0,
             )
         )
-    }
-
-    private fun materialEstimate(fen: String): Int {
-        val position = runCatching { Position.fromFen(fen) }.getOrNull() ?: return 0
-        val values = mapOf('p' to 100, 'n' to 320, 'b' to 330, 'r' to 500, 'q' to 900)
-        var score = 0
-        position.squares.forEach { piece ->
-            if (piece == '.') return@forEach
-            val value = values[piece.lowercaseChar()] ?: 0
-            score += if (piece.isUpperCase()) value else -value
-        }
-        val oriented = if (position.whiteToMove) score else -score
-        return oriented.coerceIn(-5000, 5000)
     }
 }

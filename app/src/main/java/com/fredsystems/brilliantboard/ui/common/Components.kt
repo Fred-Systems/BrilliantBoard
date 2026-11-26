@@ -191,15 +191,16 @@ fun Heatmap(values: List<Float>, columns: Int, modifier: Modifier = Modifier) {
 
 @Composable
 fun ProgressRow(label: String, value: Float, color: Color = Accent) {
+    val safe = if (value.isFinite()) value.coerceIn(0f, 100f) else 0f
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, modifier = Modifier.fillMaxWidth(0.45f), fontSize = 12.sp, color = MaterialTheme.typography.bodySmall.color)
         Box(Modifier.weight(1f).height(8.dp).background(Color(0xFF101820), RoundedCornerShape(4.dp))) {
             Box(
-                Modifier.fillMaxWidth(min(1f, value / 100f)).height(8.dp)
+                Modifier.fillMaxWidth(min(1f, safe / 100f)).height(8.dp)
                     .background(color, RoundedCornerShape(4.dp))
             )
         }
-        Text("${value.toInt()}%", fontSize = 11.sp, color = color, modifier = Modifier.padding(start = 8.dp))
+        Text("${safe.toInt()}%", fontSize = 11.sp, color = color, modifier = Modifier.padding(start = 8.dp))
     }
 }
 

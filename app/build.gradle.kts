@@ -11,8 +11,8 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-val appVersionName = "1.0.2"
-val appVersionCode = 3
+val appVersionName = "1.0.3"
+val appVersionCode = 4
 
 android {
     namespace = "com.fredsystems.brilliantboard"

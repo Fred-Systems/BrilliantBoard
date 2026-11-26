@@ -25,9 +25,10 @@ import kotlin.math.abs
 
 @Composable
 fun EvaluationBar(winPercent: Float, modifier: Modifier = Modifier) {
-    val animated = remember { Animatable(winPercent.coerceIn(0f, 100f)) }
-    LaunchedEffect(winPercent) {
-        animated.animateTo(winPercent.coerceIn(0f, 100f), tween(350))
+    val target = if (winPercent.isFinite()) winPercent.coerceIn(0f, 100f) else 50f
+    val animated = remember { Animatable(target) }
+    LaunchedEffect(target) {
+        animated.animateTo(target, tween(350))
     }
     val whiteShare = animated.value / 100f
     Box(

@@ -19,7 +19,7 @@ data class TacticalProfile(
 /** Detects recurring tactical motifs directly from stored positions — no engine required. */
 object TacticalMotifs {
 
-    fun analyze(games: List<GameRecord>, side: Side, maxGames: Int = 24): TacticalProfile {
+    fun analyze(games: List<GameRecord>, side: Side, maxGames: Int = 12): TacticalProfile {
         var missedMate = 0
         var forks = 0
         var pins = 0

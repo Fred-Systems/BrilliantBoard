@@ -62,6 +62,8 @@ fun ReviewScreen(
     val settings by settingsViewModel.state.collectAsState()
     var query by remember { mutableStateOf("") }
     var resultFilter by remember { mutableStateOf("ALL") }
+    var favouritesOnly by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(accounts.accounts.map { it.username }) {
         accounts.accounts.firstOrNull()?.let { viewModel.load(it.username) }
@@ -71,7 +73,8 @@ fun ReviewScreen(
         val matchesQuery = query.isBlank() || game.opponent.contains(query, true) ||
             game.opening?.name?.contains(query, true) == true || game.opening?.eco?.contains(query, true) == true
         val matchesResult = resultFilter == "ALL" || game.result.name == resultFilter
-        matchesQuery && matchesResult
+        val matchesFavourite = !favouritesOnly || game.id in settings.favorites
+        matchesQuery && matchesResult && matchesFavourite
     }
 
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -103,6 +106,11 @@ fun ReviewScreen(
                             label = { Text(filter) },
                         )
                     }
+                    FilterChip(
+                        selected = favouritesOnly,
+                        onClick = { favouritesOnly = !favouritesOnly },
+                        label = { Text("★ Saved") },
+                    )
                 }
                 Text("${filtered.size} games available", style = MaterialTheme.typography.bodySmall)
             }
@@ -128,6 +136,13 @@ fun ReviewScreen(
                         Modifier.weight(1f),
                         fontWeight = if (state.selected?.id == game.id) FontWeight.Bold else FontWeight.Normal,
                         color = if (state.selected?.id == game.id) Accent else MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        if (game.id in settings.favorites) "★" else "☆",
+                        modifier = Modifier
+                            .padding(horizontal = 6.dp)
+                            .clickable { settingsViewModel.toggleFavorite(game.id) },
+                        color = MaterialTheme.colorScheme.primary,
                     )
                     Text(
                         game.result.name,
@@ -187,6 +202,15 @@ fun ReviewScreen(
                                 OutlinedButton(onClick = { viewModel.jumpTo(review.ply) }) { Text("Retry mistake") }
                             }
                     }
+                    OutlinedButton(onClick = {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_TEXT, game.pgn ?: game.white + " vs " + game.black)
+                        }
+                        context.startActivity(
+                            android.content.Intent.createChooser(intent, "Share PGN"),
+                        )
+                    }, Modifier.fillMaxWidth()) { Text("Share PGN") }
                     Button(
                         onClick = {
                             viewModel.analyse(settings.settings.analysisDepth, settings.settings.multiPv)

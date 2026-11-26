@@ -13,6 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 data class ReleaseInfo(
     val version: String,
@@ -69,20 +71,65 @@ class UpdateRepository(private val client: HttpClient) {
         target: File,
         onProgress: (Float) -> Unit,
     ): File = withContext(Dispatchers.IO) {
-        val response = client.get(url) { header("User-Agent", USER_AGENT) }
-        val channel = response.bodyAsChannel()
-        val total = response.headers["Content-Length"]?.toLongOrNull() ?: 0L
-        FileOutputStream(target).use { output ->
-            val buffer = ByteArray(64 * 1024)
-            var written = 0L
-            while (!channel.isClosedForRead) {
-                val read = channel.readAvailable(buffer)
-                if (read <= 0) break
-                output.write(buffer, 0, read)
-                written += read
-                if (total > 0) onProgress((written.toFloat() / total).coerceIn(0f, 1f))
+        var failure: Throwable? = null
+        runCatching {
+            val response = client.get(url) { header("User-Agent", USER_AGENT) }
+            val channel = response.bodyAsChannel()
+            val total = response.headers["Content-Length"]?.toLongOrNull() ?: 0L
+            FileOutputStream(target).use { output ->
+                val buffer = ByteArray(64 * 1024)
+                var written = 0L
+                while (!channel.isClosedForRead) {
+                    val read = channel.readAvailable(buffer)
+                    if (read <= 0) break
+                    output.write(buffer, 0, read)
+                    written += read
+                    if (total > 0) onProgress((written.toFloat() / total).coerceIn(0f, 1f))
+                }
             }
+        }.onFailure { failure = it }
+
+        if (!isValidApk(target)) {
+            runCatching {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.instanceFollowRedirects = true
+                connection.connectTimeout = 20_000
+                connection.readTimeout = 60_000
+                connection.setRequestProperty("User-Agent", USER_AGENT)
+                connection.inputStream.use { input ->
+                    FileOutputStream(target).use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        var written = 0L
+                        val total = connection.contentLengthLong.coerceAtLeast(0)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read <= 0) break
+                            output.write(buffer, 0, read)
+                            written += read
+                            if (total > 0) onProgress((written.toFloat() / total).coerceIn(0f, 1f))
+                        }
+                    }
+                }
+                connection.disconnect()
+            }.onFailure { failure = it }
         }
+
+        if (!isValidApk(target)) {
+            throw IllegalStateException(
+                "Downloaded file is not a valid APK: ${failure?.message ?: "unknown error"}",
+            )
+        }
+        onProgress(1f)
         target
+    }
+
+    private fun isValidApk(file: File): Boolean {
+        if (!file.exists() || file.length() < 100_000L) return false
+        return runCatching {
+            file.inputStream().use { input ->
+                val magic = ByteArray(2)
+                input.read(magic, 0, 2) == 2 && magic[0] == 'P'.code.toByte() && magic[1] == 'K'.code.toByte()
+            }
+        }.getOrDefault(false)
     }
 }

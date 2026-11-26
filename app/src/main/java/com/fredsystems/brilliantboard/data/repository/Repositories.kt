@@ -66,6 +66,7 @@ data class AppSettings(
     val arrowsEnabled: Boolean = true,
     val boardScale: Float = 1f,
     val autoCheckUpdates: Boolean = true,
+    val accentTheme: String = "teal",
 )
 
 class SettingsRepository(private val context: Context) {
@@ -80,6 +81,8 @@ class SettingsRepository(private val context: Context) {
         val ARROWS = booleanPreferencesKey("arrows")
         val BOARD_SCALE = androidx.datastore.preferences.core.floatPreferencesKey("board_scale")
         val AUTO_UPDATES = booleanPreferencesKey("auto_updates")
+        val ACCENT = stringPreferencesKey("accent_theme")
+        val FAVORITES = androidx.datastore.preferences.core.stringSetPreferencesKey("favorite_games")
     }
 
     val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
@@ -94,6 +97,7 @@ class SettingsRepository(private val context: Context) {
             arrowsEnabled = prefs[Keys.ARROWS] != false,
             boardScale = prefs[Keys.BOARD_SCALE] ?: 1f,
             autoCheckUpdates = prefs[Keys.AUTO_UPDATES] != false,
+            accentTheme = prefs[Keys.ACCENT] ?: "teal",
         )
     }
 
@@ -103,6 +107,17 @@ class SettingsRepository(private val context: Context) {
         it[Keys.BOARD_SCALE] = scale.coerceIn(0.6f, 1.5f)
     }
     suspend fun setAutoUpdates(enabled: Boolean) = context.settingsDataStore.edit { it[Keys.AUTO_UPDATES] = enabled }
+    suspend fun setAccent(theme: String) = context.settingsDataStore.edit { it[Keys.ACCENT] = theme }
+
+    val favorites: Flow<Set<String>> = context.settingsDataStore.data.map { prefs ->
+        prefs[Keys.FAVORITES].orEmpty()
+    }
+
+    suspend fun toggleFavorite(gameId: String) = context.settingsDataStore.edit { prefs ->
+        val current = prefs[Keys.FAVORITES].orEmpty().toMutableSet()
+        if (!current.add(gameId)) current.remove(gameId)
+        prefs[Keys.FAVORITES] = current
+    }
     suspend fun setSound(enabled: Boolean) = context.settingsDataStore.edit { it[Keys.SOUND] = enabled }
     suspend fun setDepth(depth: Int) = context.settingsDataStore.edit { it[Keys.DEPTH] = depth.coerceIn(12, 22) }
     suspend fun setMultiPv(count: Int) = context.settingsDataStore.edit { it[Keys.MULTI_PV] = count.coerceIn(1, 5) }

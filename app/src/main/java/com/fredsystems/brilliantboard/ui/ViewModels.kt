@@ -31,6 +31,7 @@ import com.fredsystems.brilliantboard.domain.scouting.StyleProfile
 import com.fredsystems.brilliantboard.domain.scouting.TiltProfile
 import com.fredsystems.brilliantboard.domain.scouting.Wdl
 import com.fredsystems.brilliantboard.engine.HybridEvaluator
+import com.fredsystems.brilliantboard.engine.MaterialEvaluator
 import com.fredsystems.brilliantboard.engine.PgnEvaluator
 import com.fredsystems.brilliantboard.engine.StockfishEngine
 import kotlinx.coroutines.Dispatchers
@@ -253,7 +254,7 @@ class MyProfileViewModel(
     }
 
     companion object {
-        private const val ANALYSIS_GAME_LIMIT = 120
+        private const val ANALYSIS_GAME_LIMIT = 60
     }
 
     private fun buildRatingCurves(profile: PlayerProfile): List<RatingCurve> {
@@ -464,6 +465,7 @@ data class SandboxState(
     val fenInput: String = "",
     val pgnInput: String = "",
     val winPercent: Float? = null,
+    val evalLabel: String = "0.00",
     val engineAvailable: Boolean = false,
     val message: String? = null,
     val explorerInfo: String = "",
@@ -584,23 +586,36 @@ class SandboxViewModel(
     }
 
     fun evaluate() = viewModelScope.launch {
-        if (!engine.isAvailable) {
-            _state.update { it.copy(message = "Bundle libstockfish.so to enable local analysis") }
-            return@launch
-        }
         runCatching {
             val position = _state.value.position
-            val lines = engine.evaluate(position.fen(), emptyList(), 18, 3)
+            val evaluator = HybridEvaluator(engine, MaterialEvaluator)
+            val lines = evaluator.evaluate(position.fen(), emptyList(), 16, 3)
             val best = lines.firstOrNull()
             val win = WinProbability.from(best?.cp, best?.mate)?.let {
                 if (position.whiteToMove) it else 100f - it
             }
-            _state.update { it.copy(winPercent = win) }
-        }.onFailure { _state.update { it.copy(message = it.message) } }
+            val label = when {
+                best?.mate != null -> "M${kotlin.math.abs(best.mate!!)}"
+                best?.cp != null -> "${best.cp!! / 100f}"
+                else -> "0.00"
+            }
+            _state.update {
+                it.copy(
+                    winPercent = win ?: 50f,
+                    evalLabel = label,
+                    message = if (!engine.isAvailable) "Using material evaluation (Stockfish unavailable)" else it.message,
+                )
+            }
+        }.onFailure { error ->
+            _state.update { it.copy(message = "Evaluation failed: ${error.message}", winPercent = 50f) }
+        }
     }
 }
 
-data class SettingsState(val settings: com.fredsystems.brilliantboard.data.repository.AppSettings = com.fredsystems.brilliantboard.data.repository.AppSettings())
+data class SettingsState(
+    val settings: com.fredsystems.brilliantboard.data.repository.AppSettings = com.fredsystems.brilliantboard.data.repository.AppSettings(),
+    val favorites: Set<String> = emptySet(),
+)
 
 class SettingsViewModel(private val repository: SettingsRepository) : ViewModel() {
     private val _state = MutableStateFlow(SettingsState())
@@ -609,6 +624,9 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
     init {
         viewModelScope.launch {
             repository.settings.collect { _state.update { s -> s.copy(settings = it) } }
+        }
+        viewModelScope.launch {
+            repository.favorites.collect { _state.update { s -> s.copy(favorites = it) } }
         }
     }
 
@@ -619,4 +637,6 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
     fun setDepth(depth: Int) = viewModelScope.launch { repository.setDepth(depth) }
     fun setDynamic(enabled: Boolean) = viewModelScope.launch { repository.setDynamicColor(enabled) }
     fun setAutoUpdates(enabled: Boolean) = viewModelScope.launch { repository.setAutoUpdates(enabled) }
+    fun setAccent(theme: String) = viewModelScope.launch { repository.setAccent(theme) }
+    fun toggleFavorite(gameId: String) = viewModelScope.launch { repository.toggleFavorite(gameId) }
 }

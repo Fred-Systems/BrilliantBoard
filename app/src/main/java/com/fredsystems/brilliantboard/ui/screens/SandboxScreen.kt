@@ -90,7 +90,8 @@ fun SandboxScreen(
                 state.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatTile("Engine", if (state.engineAvailable) "Ready" else "Missing", Accent, Modifier.weight(1f))
-                    StatTile("Eval", state.winPercent?.let { "${it.toInt()}%" } ?: "—", modifier = Modifier.weight(1f))
+                    StatTile("Eval", state.evalLabel, modifier = Modifier.weight(1f))
+                    StatTile("Material", materialLabel(state.position), modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -159,6 +160,21 @@ fun SandboxScreen(
                 }, Modifier.fillMaxWidth()) { Text("Run Stockfish analysis") }
             }
         }
+    }
+}
+
+private fun materialLabel(position: com.fredsystems.brilliantboard.domain.chess.Position): String {
+    val values = mapOf('p' to 1, 'n' to 3, 'b' to 3, 'r' to 5, 'q' to 9)
+    var score = 0
+    position.squares.forEach { piece ->
+        if (piece == '.') return@forEach
+        score += if (piece.isUpperCase()) values[piece.lowercaseChar()] ?: 0
+        else -(values[piece.lowercaseChar()] ?: 0)
+    }
+    return when {
+        score > 0 -> "+${score}"
+        score < 0 -> score.toString()
+        else -> "="
     }
 }
 

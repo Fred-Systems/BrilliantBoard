@@ -35,7 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.fredsystems.brilliantboard.BuildConfig
@@ -111,6 +111,27 @@ fun SettingsScreen(
                             selected = settings.analysisDepth == depth,
                             onClick = { viewModel.setDepth(depth) },
                             label = { Text("$depth") },
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            SectionCard(title = "Accent colour") {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    com.fredsystems.brilliantboard.ui.theme.AccentThemes.all.forEach { accent ->
+                        Box(
+                            Modifier
+                                .size(34.dp)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                                .border(
+                                    if (accent.id == settings.accentTheme) 2.dp else 0.dp,
+                                    Color.White,
+                                    androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                                )
+                                .background(accent.color)
+                                .clickable { viewModel.setAccent(accent.id) },
                         )
                     }
                 }

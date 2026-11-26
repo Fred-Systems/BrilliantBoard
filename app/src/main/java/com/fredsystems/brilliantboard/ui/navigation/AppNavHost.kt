@@ -1,5 +1,8 @@
 package com.fredsystems.brilliantboard.ui.navigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -11,6 +14,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -49,13 +54,6 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                                 Screen.Settings.route -> "Settings"
                                 else -> "BrilliantBoard"
                             },
-                        )
-                    },
-                    navigationIcon = {
-                        Icon(
-                            painterResource(R.drawable.ic_launcher),
-                            contentDescription = "BrilliantBoard",
-                            modifier = Modifier.padding(start = 12.dp, end = 4.dp),
                         )
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -101,11 +99,20 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             }
         },
     ) { padding ->
-        NavHost(
-            navController,
-            startDestination = Screen.Splash.route,
-            Modifier.padding(padding),
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xFF0B0C10), Color(0xFF0F1620), Color(0xFF08090C)),
+                    ),
+                ),
         ) {
+            NavHost(
+                navController,
+                startDestination = Screen.Splash.route,
+            ) {
             composable(Screen.Splash.route) {
                 SplashScreen(onFinish = {
                     navController.navigate(Screen.Home.route) {
@@ -119,6 +126,7 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             composable(Screen.Review.route) { ReviewScreen() }
             composable(Screen.Sandbox.route) { SandboxScreen() }
             composable(Screen.Settings.route) { SettingsScreen() }
+            }
         }
     }
 }
