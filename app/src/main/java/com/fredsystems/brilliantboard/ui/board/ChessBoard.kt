@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -157,6 +158,9 @@ fun ChessBoard(
         onSquareClick(index)
     }
 
+    val currentHandle = rememberUpdatedState { index: Int -> handleSquare(index) }
+    val currentPosition = rememberUpdatedState { position }
+
     BoxWithConstraints(
         modifier = modifier
             .size(boardSize)
@@ -178,17 +182,17 @@ fun ChessBoard(
                         if (!change.pressed) {
                             val target = indexAt(change.position, size.width)
                             if (dragging && target != null && target != start) {
-                                val move = position.legalMoves().firstOrNull {
+                                val move = currentPosition.value().legalMoves().firstOrNull {
                                     it.from == start && it.to == target
                                 }
                                 if (move != null) {
                                     draggedMove = true
                                     onMove(move)
                                 } else {
-                                    handleSquare(start)
+                                    currentHandle.value(start)
                                 }
                             } else {
-                                handleSquare(start)
+                                currentHandle.value(start)
                             }
                             break
                         }

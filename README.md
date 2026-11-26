@@ -99,6 +99,9 @@ execute the binary from `nativeLibraryDir`.
 provide a gitignored `keystore.properties` with `storeFile`, `storePassword`, `keyAlias`,
 `keyPassword`.
 
+Versioning: every future release increments only the last number (v1.0.2 → v1.0.3 → …)
+together with `versionCode` in `app/build.gradle.kts`.
+
 These four secrets are already configured on the GitHub repository (`Settings → Secrets →
 Actions`), so future releases only require: bump versions, commit, then push a `vX.Y.Z` tag.
 The release key is stored locally at `/home/simchar70/.brilliantboard/` (gitignored, outside

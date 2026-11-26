@@ -19,20 +19,23 @@ data class TacticalProfile(
 /** Detects recurring tactical motifs directly from stored positions — no engine required. */
 object TacticalMotifs {
 
-    fun analyze(games: List<GameRecord>, side: Side): TacticalProfile {
+    fun analyze(games: List<GameRecord>, side: Side, maxGames: Int = 24): TacticalProfile {
         var missedMate = 0
         var forks = 0
         var pins = 0
         var hanging = 0
         var backRank = 0
 
-        games.forEach { game ->
-            game.moves.forEachIndexed { index, move ->
-                if (move.side != side) return@forEachIndexed
+        games.take(maxGames).forEach { game ->
+            val moves = game.moves
+            val firstIndex = maxOf(0, moves.size - 16)
+            for (index in firstIndex until moves.size) {
+                val move = moves[index]
+                if (move.side != side) continue
                 val before = runCatching {
                     game.moves.getOrNull(index - 1)?.fen?.let { Position.fromFen(it) } ?: Position.START
-                }.getOrNull() ?: return@forEachIndexed
-                val after = runCatching { Position.fromFen(move.fen) }.getOrNull() ?: return@forEachIndexed
+                }.getOrNull() ?: continue
+                val after = runCatching { Position.fromFen(move.fen) }.getOrNull() ?: continue
 
                 val ownMobility = attackedSquares(after, side == Side.WHITE)
                 val enemyMobility = attackedSquares(after, side != Side.WHITE)
@@ -80,8 +83,11 @@ object TacticalMotifs {
         return before.apply(parsed).isCheckmate()
     }
 
-    private fun opponentHasMateInOne(position: Position): Boolean =
-        position.legalMoves().any { move -> position.apply(move).isCheckmate() }
+    private fun opponentHasMateInOne(position: Position): Boolean {
+        val moves = position.legalMoves()
+        if (moves.isEmpty() || moves.size > 45) return false
+        return moves.any { move -> position.apply(move).isCheckmate() }
+    }
 
     private fun attackedSquares(position: Position, byWhite: Boolean): Set<Int> =
         position.pseudoLegalMoves()

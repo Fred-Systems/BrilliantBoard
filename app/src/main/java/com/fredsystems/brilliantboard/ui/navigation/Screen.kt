@@ -1,6 +1,7 @@
 package com.fredsystems.brilliantboard.ui.navigation
 
 sealed class Screen(val route: String, val label: String) {
+    data object Splash : Screen("splash", "Splash")
     data object Home : Screen("home", "Home")
     data object MyProfile : Screen("profile", "My Profile")
     data object Scout : Screen("scout", "Scout")

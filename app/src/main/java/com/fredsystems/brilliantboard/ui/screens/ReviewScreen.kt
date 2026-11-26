@@ -1,5 +1,6 @@
 package com.fredsystems.brilliantboard.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,31 +12,41 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.fredsystems.brilliantboard.domain.model.GameResult
 import com.fredsystems.brilliantboard.domain.model.MoveBadge
 import com.fredsystems.brilliantboard.ui.HomeViewModel
 import com.fredsystems.brilliantboard.ui.ReviewViewModel
+import com.fredsystems.brilliantboard.ui.SettingsViewModel
 import com.fredsystems.brilliantboard.ui.board.BoardWithCoords
 import com.fredsystems.brilliantboard.ui.board.EvaluationBar
+import com.fredsystems.brilliantboard.ui.board.BoardArrow
 import com.fredsystems.brilliantboard.ui.common.ChartSeries
 import com.fredsystems.brilliantboard.ui.common.EmptyState
 import com.fredsystems.brilliantboard.ui.common.LineChart
 import com.fredsystems.brilliantboard.ui.common.SectionCard
 import com.fredsystems.brilliantboard.ui.common.StatTile
 import com.fredsystems.brilliantboard.ui.theme.Accent
-import com.fredsystems.brilliantboard.ui.theme.BoardTheme
+import com.fredsystems.brilliantboard.ui.theme.BoardThemes
 import com.fredsystems.brilliantboard.ui.theme.Danger
 import com.fredsystems.brilliantboard.ui.theme.Good
 import org.koin.androidx.compose.koinViewModel
@@ -44,62 +55,105 @@ import org.koin.androidx.compose.koinViewModel
 fun ReviewScreen(
     homeViewModel: HomeViewModel = koinViewModel(),
     viewModel: ReviewViewModel = koinViewModel(),
-    settingsViewModel: com.fredsystems.brilliantboard.ui.SettingsViewModel = koinViewModel(),
+    settingsViewModel: SettingsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val accounts by homeViewModel.state.collectAsState()
     val settings by settingsViewModel.state.collectAsState()
+    var query by remember { mutableStateOf("") }
+    var resultFilter by remember { mutableStateOf("ALL") }
 
     LaunchedEffect(accounts.accounts.map { it.username }) {
         accounts.accounts.firstOrNull()?.let { viewModel.load(it.username) }
     }
 
+    val filtered = state.games.filter { game ->
+        val matchesQuery = query.isBlank() || game.opponent.contains(query, true) ||
+            game.opening?.name?.contains(query, true) == true || game.opening?.eco?.contains(query, true) == true
+        val matchesResult = resultFilter == "ALL" || game.result.name == resultFilter
+        matchesQuery && matchesResult
+    }
+
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         item {
-            SectionCard(title = "Game review") {
-                if (state.games.isEmpty()) {
-                    EmptyState("Import games from Home to review them")
-                } else {
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                        state.games.take(40).forEach { game ->
-                            OutlinedButton(
-                                onClick = { viewModel.select(game) },
-                                modifier = Modifier.padding(end = 6.dp),
-                            ) {
-                                Text("${game.opponent} ${game.result.name} · ${game.opening?.eco ?: "?"}")
-                            }
-                        }
+            SectionCard(title = "Select a game") {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                    accounts.accounts.forEach { account ->
+                        FilterChip(
+                            selected = state.selectedAccount == account.username,
+                            onClick = { viewModel.load(account.username) },
+                            label = { Text(account.username) },
+                            modifier = Modifier.padding(end = 6.dp),
+                        )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            viewModel.analyse(settings.settings.analysisDepth, settings.settings.multiPv)
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Filter by opponent or opening") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("ALL", "WIN", "DRAW", "LOSS").forEach { filter ->
+                        FilterChip(
+                            selected = resultFilter == filter,
+                            onClick = { resultFilter = filter },
+                            label = { Text(filter) },
+                        )
+                    }
+                }
+                Text("${filtered.size} games available", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
+        if (state.games.isEmpty()) {
+            item {
+                SectionCard(title = "No games yet") {
+                    EmptyState("Import an account from Home, then sync to load its games")
+                }
+            }
+        } else {
+            items(filtered.take(150)) { game ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.select(game) }
+                        .padding(horizontal = 18.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "${game.opening?.eco ?: "?"}  ${game.white} vs ${game.black}",
+                        Modifier.weight(1f),
+                        fontWeight = if (state.selected?.id == game.id) FontWeight.Bold else FontWeight.Normal,
+                        color = if (state.selected?.id == game.id) Accent else MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        game.result.name,
+                        color = when (game.result) {
+                            GameResult.WIN -> Good
+                            GameResult.LOSS -> Danger
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
-                        enabled = !state.busy && state.selected != null,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(if (state.busy) "Analysing ${(state.progress * 100).toInt()}%" else "Analyse with Stockfish") }
-                    if (state.busy) LinearProgressIndicator(
-                        progress = { state.progress },
-                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                state.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
         }
 
         state.selected?.let { game ->
             item {
-                SectionCard(title = "${game.white} vs ${game.black}") {
+                SectionCard(title = "${game.white} vs ${game.black} · ${game.timeClass.label}") {
                     Row(Modifier.fillMaxWidth()) {
                         EvaluationBar(
                             winPercent = state.report?.evalGraph?.firstOrNull { it.ply >= state.currentPly }?.winPercent
                                 ?: 50f,
-                            modifier = Modifier.height(340.dp),
+                            modifier = Modifier.height((340 * settings.settings.boardScale).dp),
                         )
                         BoardWithCoords(
                             position = state.position,
                             pieceSet = settings.settings.pieceSet,
-                            theme = com.fredsystems.brilliantboard.ui.theme.BoardThemes.byId(settings.settings.boardTheme),
+                            theme = BoardThemes.byId(settings.settings.boardTheme),
                             flipped = state.flipped,
                             lastMove = state.lastMove,
                             arrows = state.arrows,
@@ -114,7 +168,7 @@ fun ReviewScreen(
                             val badge = state.report?.reviews?.firstOrNull { it.ply == move.ply }?.badge
                             OutlinedButton(onClick = { viewModel.jumpTo(move.ply) }) {
                                 Text(
-                                    text = if (badge?.symbol?.isNotBlank() == true) "${move.san}${badge.symbol}" else move.san,
+                                    text = if (!badge?.symbol.isNullOrBlank()) "${move.san}${badge.symbol}" else move.san,
                                     color = when (badge) {
                                         MoveBadge.BLUNDER -> Danger
                                         MoveBadge.MISTAKE, MoveBadge.INACCURACY -> MaterialTheme.colorScheme.tertiary
@@ -127,13 +181,25 @@ fun ReviewScreen(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { viewModel.toggleFlip() }) { Text("Flip") }
-                        state.report?.reviews?.firstOrNull {
-                            it.ply == state.currentPly && it.isCritical
-                        }?.let { review ->
-                            Button(onClick = { viewModel.showBestLine(review.ply) }) { Text("Show best line") }
-                            OutlinedButton(onClick = { viewModel.jumpTo(review.ply) }) { Text("Retry mistake") }
-                        }
+                        state.report?.reviews?.firstOrNull { it.ply == state.currentPly && it.isCritical }
+                            ?.let { review ->
+                                Button(onClick = { viewModel.showBestLine(review.ply) }) { Text("Show best line") }
+                                OutlinedButton(onClick = { viewModel.jumpTo(review.ply) }) { Text("Retry mistake") }
+                            }
                     }
+                    Button(
+                        onClick = {
+                            viewModel.analyse(settings.settings.analysisDepth, settings.settings.multiPv)
+                        },
+                        enabled = !state.busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (state.busy) "Analysing ${(state.progress * 100).toInt()}%" else "Analyse this game")
+                    }
+                    if (state.busy) {
+                        LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
+                    }
+                    state.message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 }
             }
         }
@@ -153,7 +219,6 @@ fun ReviewScreen(
                     }
                 }
             }
-
             item {
                 SectionCard(title = "Evaluation graph") {
                     LineChart(
@@ -161,18 +226,22 @@ fun ReviewScreen(
                         minValue = 0f,
                         maxValue = 100f,
                     )
-                    Text("Tap any move above to jump to that evaluation spike",
-                        style = MaterialTheme.typography.bodySmall)
                 }
             }
-
             item {
-                SectionCard(title = "Move classification") {
+                SectionCard(title = "Critical moves") {
                     report.reviews.filter { it.isCritical }.take(30).forEach { review ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                            Text("${review.ply / 2 + 1}. ${review.san} ${review.badge.symbol}",
-                                Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                            Text("-${review.winLoss.toInt()}%", color = Danger, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                "${review.ply / 2 + 1}. ${review.san} ${review.badge.symbol}",
+                                Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Text(
+                                "-${review.winLoss.toInt()}%",
+                                color = Danger,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
                         }
                     }
                 }

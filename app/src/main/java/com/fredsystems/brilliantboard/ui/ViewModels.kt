@@ -30,6 +30,7 @@ import com.fredsystems.brilliantboard.domain.scouting.PhaseStat
 import com.fredsystems.brilliantboard.domain.scouting.StyleProfile
 import com.fredsystems.brilliantboard.domain.scouting.TiltProfile
 import com.fredsystems.brilliantboard.domain.scouting.Wdl
+import com.fredsystems.brilliantboard.engine.HybridEvaluator
 import com.fredsystems.brilliantboard.engine.PgnEvaluator
 import com.fredsystems.brilliantboard.engine.StockfishEngine
 import kotlinx.coroutines.Dispatchers
@@ -252,7 +253,7 @@ class MyProfileViewModel(
     }
 
     companion object {
-        private const val ANALYSIS_GAME_LIMIT = 400
+        private const val ANALYSIS_GAME_LIMIT = 120
     }
 
     private fun buildRatingCurves(profile: PlayerProfile): List<RatingCurve> {
@@ -300,12 +301,26 @@ class ScoutViewModel(
             runCatching {
                 val profile = sync.fetchProfile(query, platform)
                     ?: error("Player not found on ${platform.label}")
-                val games = sync.scoutGames(query, platform)
+                val allGames = sync.scoutGames(query, platform)
+                val games = allGames.take(250)
                 val own = sync.ownAccounts().map { it.username.lowercase() }.toSet()
-                val dossier = OpponentGameplan.build(query, platform, games, own)
-                _state.update { it.copy(busy = false, profile = profile, dossier = dossier) }
+                val dossier = withContext(Dispatchers.Default) {
+                    OpponentGameplan.build(query, platform, games, own)
+                }
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        profile = profile,
+                        dossier = dossier,
+                        message = if (allGames.size > games.size) {
+                            "Dossier based on the 250 most recent games"
+                        } else null,
+                    )
+                }
             }.onFailure { error ->
-                _state.update { it.copy(busy = false, message = error.message) }
+                _state.update {
+                    it.copy(busy = false, message = "Scout error: ${error.message ?: "unknown error"}")
+                }
             }
         }
     }
@@ -335,6 +350,7 @@ class ScoutViewModel(
 }
 
 data class ReviewState(
+    val selectedAccount: String? = null,
     val games: List<GameRecord> = emptyList(),
     val selected: GameRecord? = null,
     val report: GameReviewReport? = null,
@@ -358,7 +374,13 @@ class ReviewViewModel(
     fun load(username: String) {
         viewModelScope.launch {
             val games = repo.observeGames(username).first()
-            _state.update { it.copy(games = games, selected = it.selected ?: games.firstOrNull()) }
+            _state.update {
+                it.copy(
+                    selectedAccount = username,
+                    games = games,
+                    selected = if (it.selectedAccount == username) it.selected else games.firstOrNull(),
+                )
+            }
         }
     }
 
@@ -373,11 +395,14 @@ class ReviewViewModel(
         viewModelScope.launch(Dispatchers.Default) {
             _state.update { it.copy(busy = true, progress = 0.01f, message = null, report = null) }
             runCatching {
-                val evaluator = if (engine.isAvailable) engine else PgnEvaluator(game)
+                val fallback = PgnEvaluator(game)
+                val evaluator = if (engine.isAvailable) {
+                    HybridEvaluator(engine, fallback)
+                } else {
+                    fallback
+                }
                 if (!engine.isAvailable) {
-                    _state.update {
-                        it.copy(message = "Stockfish binary unavailable — using PGN/material estimates")
-                    }
+                    _state.update { it.copy(message = "Using PGN/material estimates (Stockfish unavailable)") }
                 }
                 val report = GameReviewEngine.analyse(
                     game = game,
@@ -442,6 +467,10 @@ data class SandboxState(
     val engineAvailable: Boolean = false,
     val message: String? = null,
     val explorerInfo: String = "",
+    val suggestions: List<MoveSuggestion> = emptyList(),
+    val explorerSource: String = "masters",
+    val explorerLoading: Boolean = false,
+    val history: List<Position> = emptyList(),
 )
 
 class SandboxViewModel(
@@ -455,8 +484,62 @@ class SandboxViewModel(
 
     fun onMove(move: ChessMove) {
         sounds.play(_state.value.position.pieceAt(move.to) != '.')
-        val next = _state.value.position.apply(move)
-        _state.update { it.copy(position = next, lastMove = move.from to move.to, winPercent = null) }
+        val current = _state.value
+        val next = current.position.apply(move)
+        _state.update {
+            it.copy(
+                position = next,
+                history = it.history + it.position,
+                lastMove = move.from to move.to,
+                winPercent = null,
+                suggestions = emptyList(),
+            )
+        }
+    }
+
+    fun playUci(uci: String) {
+        val move = _state.value.position.parseUci(uci) ?: return
+        if (_state.value.position.isLegal(move)) onMove(move)
+    }
+
+    fun undo() = _state.update { state ->
+        val previous = state.history.lastOrNull()
+        if (previous == null) {
+            state.copy(message = "Nothing to undo")
+        } else {
+            state.copy(
+                position = previous,
+                history = state.history.dropLast(1),
+                lastMove = null,
+                winPercent = null,
+                suggestions = emptyList(),
+            )
+        }
+    }
+
+    fun setExplorerSource(source: String) {
+        _state.update { it.copy(explorerSource = source, suggestions = emptyList()) }
+    }
+
+    fun loadExplorer() = viewModelScope.launch {
+        _state.update { it.copy(explorerLoading = true, message = null) }
+        runCatching { explorer.suggestions(_state.value.position.fen(), _state.value.explorerSource) }
+            .onSuccess { moves ->
+                _state.update {
+                    it.copy(
+                        explorerLoading = false,
+                        suggestions = moves,
+                        explorerInfo = if (moves.isEmpty()) {
+                            "No explorer data for this position"
+                        } else moves.firstOrNull()?.openingName.orEmpty(),
+                    )
+                }
+            }
+            .onFailure { error ->
+                _state.update {
+                    it.copy(explorerLoading = false, message = "Explorer unavailable: ${error.message}")
+                }
+            }
     }
 
     fun setFen(value: String) = _state.update { it.copy(fenInput = value) }
@@ -466,7 +549,14 @@ class SandboxViewModel(
     suspend fun explorerSuggestions(fen: String) = explorer.suggestions(fen)
     fun toggleFlip() = _state.update { it.copy(flipped = !it.flipped) }
     fun reset() = _state.update {
-        it.copy(position = Position.START, lastMove = null, winPercent = null, message = null)
+        it.copy(
+            position = Position.START,
+            lastMove = null,
+            winPercent = null,
+            message = null,
+            suggestions = emptyList(),
+            history = emptyList(),
+        )
     }
 
     fun loadFen() = viewModelScope.launch {

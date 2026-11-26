@@ -65,9 +65,15 @@ class StockfishEngine(private val context: Context) : PositionEvaluator {
             }, "stockfish-reader").apply { isDaemon = true }.start()
 
             send("uci")
-            waitForBlocking("uciok", 10_000)
+            val uciOk = waitForBlocking("uciok", 6_000)
             send("isready")
-            waitForBlocking("readyok", 10_000)
+            val readyOk = waitForBlocking("readyok", 6_000)
+            if (uciOk == null || readyOk == null) {
+                process?.destroy()
+                process = null
+                writer = null
+                return false
+            }
             true
         } catch (_: Exception) {
             process?.destroy()
@@ -120,7 +126,7 @@ class StockfishEngine(private val context: Context) : PositionEvaluator {
             send("go depth $depth")
             val best = mutableMapOf<Int, EngineLine>()
             runCatching {
-                withTimeout(45_000L) {
+                withTimeout(25_000L) {
                     while (true) {
                         val line = lines.receiveCatching().getOrNull() ?: break
                         if (line.startsWith("bestmove")) break

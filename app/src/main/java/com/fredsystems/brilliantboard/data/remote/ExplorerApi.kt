@@ -17,6 +17,7 @@ data class MoveSuggestion(
     val blackPercent: Float,
     val sampleSize: Int,
     val source: String,
+    val openingName: String = "",
 )
 
 class ExplorerApi(private val client: HttpClient, private val json: Json) {
@@ -28,8 +29,15 @@ class ExplorerApi(private val client: HttpClient, private val json: Json) {
         }.body<ExplorerResponse>()
     }.getOrDefault(ExplorerResponse())
 
-    suspend fun suggestions(fen: String, source: String = "masters"): List<MoveSuggestion> =
-        explore(fen, source).moves.map { it.toSuggestion(source) }
+    suspend fun suggestions(fen: String, source: String = "masters"): List<MoveSuggestion> {
+        val response = explore(fen, source)
+        val opening = response.opening?.name.orEmpty()
+        return response.moves.map { it.toSuggestion(source, opening) }
+    }
+
+    companion object {
+        val SOURCES = listOf("masters", "lichess")
+    }
 
     /** Blends explorer statistics with a local repertoire frequency overlay. */
     fun mergeWithRepertoire(
@@ -47,7 +55,7 @@ class ExplorerApi(private val client: HttpClient, private val json: Json) {
 
 data class MoveFrequencyLocal(val games: Int, val winPercent: Float)
 
-private fun ExplorerMove.toSuggestion(source: String): MoveSuggestion {
+private fun ExplorerMove.toSuggestion(source: String, openingName: String): MoveSuggestion {
     val total = (white + draw + black).coerceAtLeast(1)
     return MoveSuggestion(
         san = san,
@@ -57,6 +65,7 @@ private fun ExplorerMove.toSuggestion(source: String): MoveSuggestion {
         blackPercent = black * 100f / total,
         sampleSize = total,
         source = source,
+        openingName = openingName,
     )
 }
 
