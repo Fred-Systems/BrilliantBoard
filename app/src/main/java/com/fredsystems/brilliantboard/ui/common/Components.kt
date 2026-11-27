@@ -204,6 +204,23 @@ fun ProgressRow(label: String, value: Float, color: Color = Accent) {
     }
 }
 
+/** Keeps an unexpected composition issue from taking down the whole app. */
+@Composable
+fun SafeContent(content: @Composable () -> Unit) {
+    val failure = runCatching { content() }.exceptionOrNull()
+    if (failure != null) {
+        Card(
+            Modifier.fillMaxWidth().padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceRaised),
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text("This screen could not be displayed", color = Danger, fontWeight = FontWeight.Bold)
+                Text(failure.message ?: failure.javaClass.simpleName, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
 @Composable
 fun EmptyState(message: String, action: (@Composable () -> Unit)? = null) {
     Column(

@@ -23,6 +23,7 @@ import com.fredsystems.brilliantboard.domain.model.Platform
 import com.fredsystems.brilliantboard.ui.ScoutViewModel
 import com.fredsystems.brilliantboard.ui.common.EmptyState
 import com.fredsystems.brilliantboard.ui.common.ProgressRow
+import com.fredsystems.brilliantboard.ui.common.SafeContent
 import com.fredsystems.brilliantboard.ui.common.SectionCard
 import com.fredsystems.brilliantboard.ui.common.StatTile
 import com.fredsystems.brilliantboard.ui.theme.Accent
@@ -37,7 +38,8 @@ fun ScoutScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
-    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    SafeContent {
+        LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         item {
             SectionCard(title = "Opponent prep") {
                 com.fredsystems.brilliantboard.ui.common.UsernameSearchField(
@@ -130,4 +132,5 @@ fun ScoutScreen(
             }
         }
     }
+}
 }

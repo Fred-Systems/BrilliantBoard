@@ -165,12 +165,12 @@ class SyncEngine(
 
     suspend fun scoutGames(username: String, platform: Platform): List<GameRecord> =
         withContext(Dispatchers.IO) {
-            val cached = gameDao.observeGames(username.lowercase(), 10_000).firstOrNull().orEmpty()
+            val cached = gameDao.observeGames(username.lowercase(), 50_000).firstOrNull().orEmpty()
             if (cached.isNotEmpty()) {
                 cached.mapNotNull { it.toRecord(parser) }
             } else {
                 sync(username, platform)
-                gameDao.observeGames(username.lowercase(), 10_000).firstOrNull()
+                gameDao.observeGames(username.lowercase(), 50_000).firstOrNull()
                     .orEmpty().mapNotNull { it.toRecord(parser) }
             }
         }

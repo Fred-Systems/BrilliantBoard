@@ -354,6 +354,7 @@ data class ReviewState(
     val selectedAccount: String? = null,
     val games: List<GameRecord> = emptyList(),
     val selected: GameRecord? = null,
+    val analysedGameId: String? = null,
     val report: GameReviewReport? = null,
     val busy: Boolean = false,
     val progress: Float = 0f,
@@ -375,18 +376,31 @@ class ReviewViewModel(
     fun load(username: String) {
         viewModelScope.launch {
             val games = repo.observeGames(username).first()
+            val previous = _state.value
+            val nextGame = if (previous.selectedAccount == username) previous.selected else games.firstOrNull()
             _state.update {
                 it.copy(
                     selectedAccount = username,
                     games = games,
-                    selected = if (it.selectedAccount == username) it.selected else games.firstOrNull(),
+                    selected = nextGame,
                 )
             }
+            nextGame?.let { select(it) }
         }
     }
 
-    fun select(game: GameRecord) = _state.update {
-        it.copy(selected = game, report = null, currentPly = 0, position = Position.START, lastMove = null, arrows = emptyList())
+    fun select(game: GameRecord) {
+        _state.update {
+            it.copy(
+                selected = game,
+                report = null,
+                currentPly = 0,
+                position = Position.START,
+                lastMove = null,
+                arrows = emptyList(),
+            )
+        }
+        if (_state.value.analysedGameId != game.id) analyse(12, 3)
     }
 
     fun toggleFlip() = _state.update { it.copy(flipped = !it.flipped) }
@@ -413,10 +427,16 @@ class ReviewViewModel(
                     maxPlies = 120,
                     onProgress = { progress -> _state.update { it.copy(progress = progress) } },
                 )
-                _state.update { it.copy(busy = false, progress = 1f, report = report) }
+                _state.update {
+                    it.copy(busy = false, progress = 1f, report = report, analysedGameId = game.id)
+                }
             }.onFailure { error ->
                 _state.update {
-                    it.copy(busy = false, message = "Analysis failed: ${error.message ?: "unknown error"}")
+                    it.copy(
+                        busy = false,
+                        analysedGameId = game.id,
+                        message = "Analysis failed: ${error.message ?: "unknown error"}",
+                    )
                 }
             }
         }
@@ -466,6 +486,8 @@ data class SandboxState(
     val pgnInput: String = "",
     val winPercent: Float? = null,
     val evalLabel: String = "0.00",
+    val evalCp: Int? = null,
+    val evalMate: Int? = null,
     val engineAvailable: Boolean = false,
     val message: String? = null,
     val explorerInfo: String = "",
@@ -485,8 +507,9 @@ class SandboxViewModel(
     val state: StateFlow<SandboxState> = _state.asStateFlow()
 
     fun onMove(move: ChessMove) {
-        sounds.play(_state.value.position.pieceAt(move.to) != '.')
         val current = _state.value
+        val nextCheck = runCatching { current.position.apply(move).isCheck() }.getOrDefault(false)
+        sounds.play(current.position.pieceAt(move.to) != '.', nextCheck)
         val next = current.position.apply(move)
         _state.update {
             it.copy(
@@ -603,6 +626,8 @@ class SandboxViewModel(
                 it.copy(
                     winPercent = win ?: 50f,
                     evalLabel = label,
+                    evalCp = best?.cp,
+                    evalMate = best?.mate,
                     message = if (!engine.isAvailable) "Using material evaluation (Stockfish unavailable)" else it.message,
                 )
             }

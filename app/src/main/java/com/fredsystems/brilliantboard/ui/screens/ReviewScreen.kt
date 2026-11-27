@@ -63,6 +63,7 @@ fun ReviewScreen(
     var query by remember { mutableStateOf("") }
     var resultFilter by remember { mutableStateOf("ALL") }
     var favouritesOnly by remember { mutableStateOf(false) }
+    var visibleCount by remember { mutableStateOf(60) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(accounts.accounts.map { it.username }) {
@@ -123,7 +124,7 @@ fun ReviewScreen(
                 }
             }
         } else {
-            items(filtered.take(150)) { game ->
+            items(filtered.take(visibleCount)) { game ->
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -154,6 +155,14 @@ fun ReviewScreen(
                     )
                 }
             }
+            if (visibleCount < filtered.size) {
+                item {
+                    OutlinedButton(
+                        onClick = { visibleCount += 60 },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    ) { Text("Show 60 more games (${filtered.size - visibleCount} remaining)") }
+                }
+            }
         }
 
         state.selected?.let { game ->
@@ -161,8 +170,11 @@ fun ReviewScreen(
                 SectionCard(title = "${game.white} vs ${game.black} · ${game.timeClass.label}") {
                     Row(Modifier.fillMaxWidth()) {
                         EvaluationBar(
-                            winPercent = state.report?.evalGraph?.firstOrNull { it.ply >= state.currentPly }?.winPercent
-                                ?: 50f,
+                            scoreCp = state.report?.evalGraph?.firstOrNull { it.ply >= state.currentPly }?.cp,
+                            mate = state.report?.evalGraph?.firstOrNull { it.ply >= state.currentPly }?.mate,
+                            whiteToMove = if (state.currentPly == 0) true
+                            else game.moves.getOrNull(state.currentPly - 1)?.side ==
+                                com.fredsystems.brilliantboard.domain.model.Side.WHITE,
                             modifier = Modifier.height((340 * settings.settings.boardScale).dp),
                         )
                         BoardWithCoords(

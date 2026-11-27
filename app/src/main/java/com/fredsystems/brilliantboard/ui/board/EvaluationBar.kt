@@ -16,42 +16,65 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.abs
 
+/**
+ * Traditional vertical evaluation bar: white fills from the bottom, black from the top,
+ * animated smoothly between positions. Engine centipawns are relative to the side to move.
+ */
 @Composable
-fun EvaluationBar(winPercent: Float, modifier: Modifier = Modifier) {
-    val target = if (winPercent.isFinite()) winPercent.coerceIn(0f, 100f) else 50f
-    val animated = remember { Animatable(target) }
+fun EvaluationBar(
+    scoreCp: Int?,
+    mate: Int? = null,
+    whiteToMove: Boolean = true,
+    modifier: Modifier = Modifier,
+) {
+    val whiteCp = when {
+        mate != null -> if (mate > 0 && whiteToMove || mate < 0 && !whiteToMove) 10000 else -10000
+        scoreCp != null -> if (whiteToMove) scoreCp else -scoreCp
+        else -> 0
+    }
+    val target = (100.0 / (1.0 + kotlin.math.exp(-0.00368208 * whiteCp.coerceIn(-10000, 10000)))).toFloat()
+    val animated = remember { Animatable(target.coerceIn(0f, 100f)) }
     LaunchedEffect(target) {
-        animated.animateTo(target, tween(350))
+        animated.animateTo(target.coerceIn(0f, 100f), tween(420))
     }
     val whiteShare = animated.value / 100f
+
     Box(
         modifier
             .width(20.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(Color(0xFF0B0A10)),
     ) {
         Canvas(Modifier.matchParentSize()) {
             drawRect(
-                brush = Brush.verticalGradient(listOf(Color(0xFF2B2838), Color(0xFF14121C))),
-                size = size,
+                brush = Brush.verticalGradient(listOf(Color(0xFF37323F), Color(0xFF14121C))),
+                size = Size(size.width, size.height),
             )
             val whiteHeight = size.height * whiteShare
             drawRect(
-                brush = Brush.verticalGradient(listOf(Color(0xFFF4F1EA), Color(0xFFD8D2C4))),
+                brush = Brush.verticalGradient(listOf(Color(0xFFFFFDF5), Color(0xFFD8D2C4))),
                 topLeft = Offset(0f, size.height - whiteHeight),
-                size = androidx.compose.ui.geometry.Size(size.width, whiteHeight),
+                size = Size(size.width, whiteHeight),
             )
         }
+        val label = when {
+            mate != null -> "M${kotlin.math.abs(mate)}"
+            scoreCp != null -> {
+                val value = whiteCp / 100f
+                if (value > 0) "+${String.format("%.1f", value)}" else String.format("%.1f", value)
+            }
+            else -> "0.0"
+        }
         Text(
-            text = if (abs(winPercent - 50f) < 0.5f) "=" else "${winPercent.toInt()}",
-            color = Color(0xFFB8B3C7),
+            label,
+            color = if (whiteShare > 0.5f) Color(0xFF1A1720) else Color(0xFFD6CFE4),
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.align(Alignment.Center),
@@ -60,14 +83,5 @@ fun EvaluationBar(winPercent: Float, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun CentipawnEvaluationBar(cp: Int?, mate: Int?, modifier: Modifier = Modifier) {
-    val win = when {
-        mate != null -> if (mate > 0) 99f else 1f
-        cp != null -> 100.0 / (1.0 + kotlin.math.exp(-0.00368208 * cp.coerceIn(-10000, 10000)))
-        else -> 50.0
-    }.toFloat()
-    EvaluationBar(win, modifier)
-}
-
-@Suppress("unused")
-private val unusedOffset = Offset.Zero
+fun CentipawnEvaluationBar(cp: Int?, mate: Int?, whiteToMove: Boolean, modifier: Modifier = Modifier) =
+    EvaluationBar(cp, mate, whiteToMove, modifier)

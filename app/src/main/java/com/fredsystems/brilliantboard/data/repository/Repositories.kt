@@ -26,7 +26,7 @@ class ChessRepository(
     private val parser: PgnParser,
 ) {
     fun observeGames(username: String): Flow<List<GameRecord>> = gameDao
-        .observeGames(username.lowercase(), 10_000)
+        .observeGames(username.lowercase(), 50_000)
         .map { entities ->
             entities.mapNotNull { entity ->
                 runCatching { entity.toRecord(parser) }.getOrNull()

@@ -147,6 +147,16 @@ fun SettingsScreen(
         }
 
         item {
+            SectionCard(title = "Diagnostics") {
+                val crash = com.fredsystems.brilliantboard.util.CrashLogger.latest(context)
+                Text(
+                    if (crash == null) "No unexpected errors recorded." else "Last error:\n${crash}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+
+        item {
             SectionCard(title = "Updates · current v${BuildConfig.VERSION_NAME}") {
                 Button(onClick = { updateViewModel.check() }, Modifier.fillMaxWidth()) {
                     Text(if (updateState.checking) "Checking…" else "Check for updates")

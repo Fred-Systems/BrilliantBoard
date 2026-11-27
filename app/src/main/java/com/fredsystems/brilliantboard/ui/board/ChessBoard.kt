@@ -103,7 +103,7 @@ fun ChessBoard(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
-    val animation = remember { Animatable(1f) }
+    val animation = remember(lastMove?.first, lastMove?.second) { Animatable(0f) }
     var internalSelected by remember { mutableStateOf<Int?>(null) }
     var dragFrom by remember { mutableStateOf<Int?>(null) }
     var dragPosition by remember { mutableStateOf(Offset.Zero) }
@@ -123,8 +123,7 @@ fun ChessBoard(
     LaunchedEffect(lastMove?.first, lastMove?.second) {
         internalSelected = null
         if (lastMove != null && !draggedMove) {
-            animation.snapTo(0f)
-            animation.animateTo(1f, tween(190, easing = FastOutSlowInEasing))
+            animation.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
         } else {
             animation.snapTo(1f)
         }

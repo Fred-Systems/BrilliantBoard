@@ -22,6 +22,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -57,11 +58,21 @@ fun SandboxScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    LaunchedEffect(state.position.squares, state.position.whiteToMove) {
+        kotlinx.coroutines.delay(250)
+        viewModel.evaluate()
+    }
+
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         item {
             SectionCard(title = "Free analysis / sandbox") {
                 Row(Modifier.fillMaxWidth()) {
-                    EvaluationBar(winPercent = state.winPercent ?: 50f, modifier = Modifier.height((340 * settings.settings.boardScale).dp))
+                    EvaluationBar(
+                        scoreCp = state.evalCp,
+                        mate = state.evalMate,
+                        whiteToMove = state.position.whiteToMove,
+                        modifier = Modifier.height((340 * settings.settings.boardScale).dp),
+                    )
                     BoardWithCoords(
                         position = state.position,
                         pieceSet = settings.settings.pieceSet,
