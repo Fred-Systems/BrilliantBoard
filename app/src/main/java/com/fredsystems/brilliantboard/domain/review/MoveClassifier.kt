@@ -38,10 +38,11 @@ object MoveClassifier {
             return MoveBadge.GREAT
         }
 
-        if (input.missedForcedMate && loss > 5f) return MoveBadge.BLUNDER
+        if (input.missedForcedMate && loss > 5f) return MoveBadge.MISSED_MATE
 
         return when {
             loss <= 1f && input.isEngineTopMove -> MoveBadge.BEST
+            loss <= 2.5f && input.isEngineTopMove -> MoveBadge.EXCELLENT
             loss <= 5f -> MoveBadge.GOOD
             loss <= 10f -> MoveBadge.INACCURACY
             loss <= 20f -> MoveBadge.MISTAKE
@@ -53,6 +54,8 @@ object MoveClassifier {
         MoveBadge.BOOK -> "Opening book move"
         MoveBadge.FORCED -> "Only legal move"
         MoveBadge.BEST -> "Best move"
+        MoveBadge.EXCELLENT -> "Excellent move"
+        MoveBadge.MISSED_MATE -> "Missed a forced mate"
         MoveBadge.GREAT -> "Great move! Only move keeping the advantage"
         MoveBadge.BRILLIANT -> "Brilliant sacrifice!"
         MoveBadge.GOOD -> "Good move"

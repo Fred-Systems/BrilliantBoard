@@ -180,16 +180,18 @@ data class EngineLine(
     } ?: cp?.let { if (it >= 0) "+${it / 100f}" else "${it / 100f}" } ?: "0.00"
 }
 
-enum class MoveBadge(val symbol: String, val colorHex: String) {
-    BOOK("", "#9AA0A6"),
-    FORCED("", "#9AA0A6"),
-    BEST("", "#81B64C"),
-    GREAT("!", "#68A7F8"),
-    BRILLIANT("!!", "#1BD0D8"),
-    GOOD("", "#81B64C"),
-    INACCURACY("?!", "#F3C969"),
-    MISTAKE("?", "#F29B4C"),
-    BLUNDER("??", "#E76A5E"),
+enum class MoveBadge(val symbol: String, val colorHex: String, val description: String) {
+    BOOK("", "#9AA0A6", "Opening book move"),
+    FORCED("", "#9AA0A6", "Only legal move"),
+    BEST("", "#81B64C", "Engine's top choice"),
+    EXCELLENT("", "#9BD35C", "Excellent move, near best"),
+    GREAT("!", "#68A7F8", "Only move keeping the advantage"),
+    BRILLIANT("!!", "#1BD0D8", "Sound sacrifice"),
+    GOOD("", "#81B64C", "Good move"),
+    INACCURACY("?!", "#F3C969", "Small loss of advantage"),
+    MISTAKE("?", "#F29B4C", "Clear loss of advantage"),
+    MISSED_MATE("?", "#B86BFF", "Missed a forced mate"),
+    BLUNDER("??", "#E76A5E", "Major loss of advantage"),
 }
 
 data class MoveReview(
@@ -206,7 +208,8 @@ data class MoveReview(
     val comment: String? = null,
 ) {
     val isCritical: Boolean get() = badge in setOf(
-        MoveBadge.INACCURACY, MoveBadge.MISTAKE, MoveBadge.BLUNDER, MoveBadge.BRILLIANT
+        MoveBadge.INACCURACY, MoveBadge.MISTAKE, MoveBadge.BLUNDER,
+        MoveBadge.BRILLIANT, MoveBadge.MISSED_MATE, MoveBadge.GREAT,
     )
 }
 

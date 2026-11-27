@@ -254,7 +254,7 @@ class MyProfileViewModel(
     }
 
     companion object {
-        private const val ANALYSIS_GAME_LIMIT = 60
+        private const val ANALYSIS_GAME_LIMIT = 30
     }
 
     private fun buildRatingCurves(profile: PlayerProfile): List<RatingCurve> {
@@ -364,6 +364,16 @@ data class ReviewState(
     val lastMove: Pair<Int, Int>? = null,
     val arrows: List<com.fredsystems.brilliantboard.ui.board.BoardArrow> = emptyList(),
     val flipped: Boolean = false,
+    val drill: DrillState? = null,
+    val linePlaying: Boolean = false,
+)
+
+data class DrillState(
+    val ply: Int,
+    val expectedUci: String,
+    val attempts: Int = 0,
+    val feedback: String? = null,
+    val solved: Boolean = false,
 )
 
 class ReviewViewModel(
@@ -404,6 +414,17 @@ class ReviewViewModel(
     }
 
     fun toggleFlip() = _state.update { it.copy(flipped = !it.flipped) }
+
+    fun step(delta: Int) {
+        val game = _state.value.selected ?: return
+        jumpTo((_state.value.currentPly + delta).coerceIn(0, game.moves.size))
+    }
+
+    fun firstMove() = jumpTo(0)
+
+    fun lastMove() {
+        _state.value.selected?.let { jumpTo(it.moves.size) }
+    }
 
     fun analyse(depth: Int = 16, multiPv: Int = 3) {
         val game = _state.value.selected ?: return
@@ -463,6 +484,64 @@ class ReviewViewModel(
         }
         _state.update { it.copy(position = position, lastMove = lastMove, arrows = arrows) }
     }
+
+    /** Plays Stockfish's top line one move every 500 ms with a growing arrow trail. */
+    fun playLine(ply: Int) {
+        val game = _state.value.selected ?: return
+        val review = _state.value.report?.reviews?.firstOrNull { it.ply == ply } ?: return
+        if (_state.value.linePlaying) return
+        viewModelScope.launch(Dispatchers.Default) {
+            _state.update { it.copy(linePlaying = true, drill = null) }
+            var position = positionAt(game, ply).first
+            var lastMove: Pair<Int, Int>? = null
+            val arrows = mutableListOf<com.fredsystems.brilliantboard.ui.board.BoardArrow>()
+            _state.update { it.copy(position = position, lastMove = null, arrows = emptyList()) }
+            review.bestLine.take(8).forEach { uci ->
+                val move = position.parseUci(uci) ?: return@forEach
+                if (!position.isLegal(move)) return@forEach
+                kotlinx.coroutines.delay(500)
+                lastMove = move.from to move.to
+                arrows += com.fredsystems.brilliantboard.ui.board.BoardArrow(
+                    move.from, move.to, com.fredsystems.brilliantboard.ui.theme.Accent,
+                )
+                position = position.apply(move)
+                _state.update {
+                    it.copy(position = position, lastMove = lastMove, arrows = arrows.toList())
+                }
+            }
+            _state.update { it.copy(linePlaying = false) }
+        }
+    }
+
+    fun startDrill(ply: Int) {
+        val review = _state.value.report?.reviews?.firstOrNull { it.ply == ply } ?: return
+        val expected = review.bestMoveUci ?: return
+        jumpTo(ply)
+        _state.update {
+            it.copy(
+                drill = DrillState(ply = ply, expectedUci = expected, feedback = "Find the best move"),
+                arrows = emptyList(),
+            )
+        }
+    }
+
+    fun attemptDrill(move: ChessMove) {
+        val drill = _state.value.drill ?: return
+        if (drill.solved) return
+        val correct = move.uci.equals(drill.expectedUci, true)
+        _state.update {
+            it.copy(
+                drill = drill.copy(
+                    attempts = drill.attempts + 1,
+                    solved = correct,
+                    feedback = if (correct) "Correct — that's the engine's best move!" else
+                        "Not the best move. Try another one.",
+                ),
+            )
+        }
+    }
+
+    fun stopDrill() = _state.update { it.copy(drill = null) }
 
     private fun positionAt(game: GameRecord, ply: Int): Pair<Position, Pair<Int, Int>?> {
         var position = Position.START

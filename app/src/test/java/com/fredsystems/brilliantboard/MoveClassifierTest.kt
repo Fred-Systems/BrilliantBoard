@@ -45,9 +45,9 @@ class MoveClassifierTest {
     }
 
     @Test
-    fun missedMateIsABlunder() {
+    fun missedMateGetsItsOwnBadge() {
         val input = input(95f, 70f) { copy(missedForcedMate = true) }
-        assertEquals(MoveBadge.BLUNDER, MoveClassifier.classify(input))
+        assertEquals(MoveBadge.MISSED_MATE, MoveClassifier.classify(input))
     }
 }
 

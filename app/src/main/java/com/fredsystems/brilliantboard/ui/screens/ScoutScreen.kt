@@ -25,6 +25,7 @@ import com.fredsystems.brilliantboard.ui.common.EmptyState
 import com.fredsystems.brilliantboard.ui.common.ProgressRow
 import com.fredsystems.brilliantboard.ui.common.SafeContent
 import com.fredsystems.brilliantboard.ui.common.SectionCard
+import com.fredsystems.brilliantboard.ui.common.WdlBar
 import com.fredsystems.brilliantboard.ui.common.StatTile
 import com.fredsystems.brilliantboard.ui.theme.Accent
 import com.fredsystems.brilliantboard.ui.theme.Danger
@@ -83,6 +84,13 @@ fun ScoutScreen(
                         StatTile("H2H", dossier.headToHead.games.toString(), Accent, Modifier.weight(1f))
                         StatTile("Score", "${dossier.headToHead.wdl.scorePercent.toInt()}%", modifier = Modifier.weight(1f))
                     }
+                    Spacer(Modifier.height(8.dp))
+                    WdlBar(dossier.headToHead.wdl)
+                    Text(
+                        "Head-to-head: ${dossier.headToHead.wdl.wins} wins · ${dossier.headToHead.wdl.draws} draws · " +
+                            "${dossier.headToHead.wdl.losses} losses across ${dossier.headToHead.games} games",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
 
@@ -128,6 +136,12 @@ fun ScoutScreen(
                     ProgressRow("Flagging vulnerability", dossier.style.flaggingVulnerability, Warning)
                     ProgressRow("Tilt susceptibility", dossier.style.tiltSusceptibility, Danger)
                     ProgressRow("Score after 2 losses", dossier.tilt.afterTwoLosses, Warning)
+                    Text(
+                        "Average game length: ${dossier.style.averageGameLength.toInt()} moves · " +
+                            "Predictability: ${dossier.style.predictability.toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

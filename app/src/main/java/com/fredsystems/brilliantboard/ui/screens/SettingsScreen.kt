@@ -161,6 +161,14 @@ fun SettingsScreen(
                 Button(onClick = { updateViewModel.check() }, Modifier.fillMaxWidth()) {
                     Text(if (updateState.checking) "Checking…" else "Check for updates")
                 }
+                OutlinedButton(onClick = {
+                    context.startActivity(
+                        android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("https://github.com/Fred-Systems/BrilliantBoard/releases"),
+                        ),
+                    )
+                }, Modifier.fillMaxWidth()) { Text("Open releases page (manual install)") }
                 updateState.info?.let { info ->
                     Spacer(Modifier.height(8.dp))
                     Text("Latest: ${info.name} (${info.version})", style = MaterialTheme.typography.titleSmall)

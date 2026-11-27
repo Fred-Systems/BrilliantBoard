@@ -1,6 +1,8 @@
 package com.fredsystems.brilliantboard.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,12 +51,33 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            Text("BrilliantBoard", style = MaterialTheme.typography.headlineMedium)
-            Text("Chess intelligence & game review", style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatTile("Accounts", state.accounts.size.toString(), modifier = Modifier.weight(1f))
-                StatTile("Games", state.totalGames.toString(), modifier = Modifier.weight(1f))
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                    .background(
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            listOf(
+                                androidx.compose.ui.graphics.Color(0xFF123B3A),
+                                androidx.compose.ui.graphics.Color(0xFF142133),
+                                androidx.compose.ui.graphics.Color(0xFF0B0C10),
+                            ),
+                        ),
+                    )
+                    .padding(18.dp),
+            ) {
+                Column {
+                    Text("BrilliantBoard", style = MaterialTheme.typography.headlineMedium,
+                        color = com.fredsystems.brilliantboard.ui.theme.Accent)
+                    Text("Chess intelligence · preparation · review",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = androidx.compose.ui.graphics.Color(0xFFB9C4CC))
+                    Spacer(Modifier.height(14.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatTile("Accounts", state.accounts.size.toString(), modifier = Modifier.weight(1f))
+                        StatTile("Games", state.totalGames.toString(), modifier = Modifier.weight(1f))
+                    }
+                }
             }
         }
 

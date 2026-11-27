@@ -187,31 +187,59 @@ fun ReviewScreen(
                             showLegalMoves = false,
                             boardSize = (340 * settings.settings.boardScale).dp,
                             onSquareClick = {},
-                            onMove = {},
+                            onMove = { move ->
+                                if (state.drill != null) viewModel.attemptDrill(move)
+                            },
                         )
                     }
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                        game.moves.forEach { move ->
-                            val badge = state.report?.reviews?.firstOrNull { it.ply == move.ply }?.badge
-                            OutlinedButton(onClick = { viewModel.jumpTo(move.ply) }) {
-                                Text(
-                                    text = if (!badge?.symbol.isNullOrBlank()) "${move.san}${badge.symbol}" else move.san,
-                                    color = when (badge) {
-                                        MoveBadge.BLUNDER -> Danger
-                                        MoveBadge.MISTAKE, MoveBadge.INACCURACY -> MaterialTheme.colorScheme.tertiary
-                                        MoveBadge.BRILLIANT -> Accent
-                                        else -> MaterialTheme.colorScheme.onSurface
-                                    },
-                                )
-                            }
-                        }
+                    state.drill?.let { drill ->
+                        Text(
+                            drill.feedback ?: "Find the best move",
+                            color = if (drill.solved) Good else MaterialTheme.colorScheme.tertiary,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        OutlinedButton(onClick = { viewModel.stopDrill() }) { Text("Exit drill") }
+                    }
+                    com.fredsystems.brilliantboard.ui.common.MoveList(
+                        moves = game.moves,
+                        reviews = state.report?.reviews?.associateBy { it.ply }.orEmpty(),
+                        currentPly = state.currentPly,
+                        onSelect = { viewModel.jumpTo(it) },
+                    )
+                }
+            }
+
+            item {
+                SectionCard(title = "Game details") {
+                    Text("${game.white} vs ${game.black} · ${game.result.name}",
+                        style = MaterialTheme.typography.titleSmall)
+                    Text("Opening: ${game.opening?.name ?: "—"} (${game.opening?.eco ?: "—"})",
+                        style = MaterialTheme.typography.bodySmall)
+                    Text("Time control: ${game.timeControl ?: "—"} · ${game.timeClass.label} · Rated: ${game.rated}",
+                        style = MaterialTheme.typography.bodySmall)
+                    Text("Termination: ${game.termination.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            item {
+                SectionCard(title = "Review controls") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(onClick = { viewModel.firstMove() }) { Text("|◀") }
+                        OutlinedButton(onClick = { viewModel.step(-1) }) { Text("◀") }
+                        OutlinedButton(onClick = { viewModel.step(1) }) { Text("▶") }
+                        OutlinedButton(onClick = { viewModel.lastMove() }) { Text("▶|") }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { viewModel.toggleFlip() }) { Text("Flip") }
                         state.report?.reviews?.firstOrNull { it.ply == state.currentPly && it.isCritical }
                             ?.let { review ->
-                                Button(onClick = { viewModel.showBestLine(review.ply) }) { Text("Show best line") }
-                                OutlinedButton(onClick = { viewModel.jumpTo(review.ply) }) { Text("Retry mistake") }
+                                Button(onClick = { viewModel.playLine(review.ply) }) {
+                                    Text(if (state.linePlaying) "Playing…" else "Show line")
+                                }
+                                OutlinedButton(onClick = { viewModel.startDrill(review.ply) }) {
+                                    Text("Retry mistake")
+                                }
                             }
                     }
                     OutlinedButton(onClick = {
@@ -256,11 +284,11 @@ fun ReviewScreen(
                 }
             }
             item {
-                SectionCard(title = "Evaluation graph") {
-                    LineChart(
-                        series = listOf(ChartSeries("Win %", report.evalGraph.map { it.winPercent }, Accent)),
-                        minValue = 0f,
-                        maxValue = 100f,
+                SectionCard(title = "Evaluation graph · drag to explore") {
+                    com.fredsystems.brilliantboard.ui.common.InteractiveEvalGraph(
+                        points = report.evalGraph,
+                        currentPly = state.currentPly,
+                        onScrub = { viewModel.jumpTo(it) },
                     )
                 }
             }
